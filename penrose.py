@@ -2,11 +2,14 @@ import math
 import random
 
 # A small tolerance for comparing floats for equality
+from matplotlib import pyplot
+
 TOL = 1.e-5
 # psi = 1/phi where phi is the Golden ratio, sqrt(5)+1)/2
 psi = (math.sqrt(5) - 1) / 2
 # psi**2 = 1 - psi
 psi2 = 1 - psi
+
 
 class RobinsonTriangle:
     """
@@ -20,8 +23,11 @@ class RobinsonTriangle:
         vertices at the equal base angles; B is at the vertex angle.
 
         """
- 
         self.A, self.B, self.C = A, B, C
+
+    @property
+    def D(self):
+        return self.C + self.A - self.B
 
     def centre(self):
         """
@@ -32,6 +38,9 @@ class RobinsonTriangle:
 
         return (self.A + self.C) / 2
 
+    def get_points(self, pointslist):
+        return [[p[0] for p in pointslist], [p[1] for p in pointslist]]
+
     def path(self, rhombus=True):
         """
         Return the SVG "d" path element specifier for the rhombus formed
@@ -39,15 +48,13 @@ class RobinsonTriangle:
         rhombus=False, the path for the triangle itself is returned instead.
 
         """
-
-        AB, BC = self.B - self.A, self.C - self.B 
+        AB, BC = self.B - self.A, self.C - self.B
         xy = lambda v: (v.real, v.imag)
         if rhombus:
             return 'm{},{} l{},{} l{},{} l{},{}z'.format(*xy(self.A) + xy(AB)
-                                                        + xy(BC) + xy(-AB))
+                                                          + xy(BC) + xy(-AB))
         return 'm{},{} l{},{} l{},{}z'.format(*xy(self.A) + xy(AB)
                                                         + xy(BC))
-
 
     def get_arc_d(self, U, V, W, half_arc=False):
         """
@@ -103,6 +110,7 @@ class RobinsonTriangle:
         return self.__class__(self.A.conjugate(), self.B.conjugate(),
                               self.C.conjugate())
 
+
 class BtileL(RobinsonTriangle):
     """
     A class representing a "B_L" Penrose tile in the P3 tiling scheme as
@@ -126,6 +134,7 @@ class BtileL(RobinsonTriangle):
                 BtileS(E, D, self.B),
                 BtileL(self.C, D, self.B)]
 
+
 class BtileS(RobinsonTriangle):
     """
     A class representing a "B_S" Penrose tile in the P3 tiling scheme as
@@ -142,6 +151,7 @@ class BtileS(RobinsonTriangle):
         D = psi * self.A + psi2 * self.B
         return [BtileS(D, self.C, self.A),
                 BtileL(self.C, D, self.B)]
+
 
 class PenroseP3:
     """ A class representing the P3 Penrose tiling. """
@@ -180,7 +190,6 @@ class PenroseP3:
         # And ensure width, height values are strings for the SVG
         self.config['width'] = str(self.config['width'])
         self.config['height'] = str(self.config['height'])
-
         self.elements = []
 
     def set_initial_tiles(self, tiles):
@@ -314,6 +323,71 @@ class PenroseP3:
                                 .format(self.config['Carc-colour'], arc2_d))
         svg.append('</g>\n</svg>')
         return '\n'.join(svg)
+
+    def make_matplotlib(self):
+        x = []
+        y = []
+        for e in self.elements:
+            points = e.path(rhombus=self.config['draw-rhombuses']).lower()
+            points = points.replace("m", "").replace("l", "").replace("z", "")
+            points = [[float(p) for p in part.split(",")] for part in points.split(" ")]
+            for p in points:
+                x.append(p[0])
+                y.append(p[1])
+        return x,y
+
+    def remove_duplicate_points(self, x, y):
+        new_x = []
+        new_y = []
+        for i in range(len(x)):
+            dis = [math.sqrt((new_x[j]-x[i])**2.0 + (new_y[j]-y[i])**2.0) for j in range(len(new_x))]
+            if len(dis) == 0:
+                new_x.append(x[i])
+                new_y.append(y[i])
+                continue
+            min_distance = min(dis)
+            if min_distance > 2:
+                new_x.append(x[i])
+                new_y.append(y[i])
+        print(len(new_x))
+        return new_x, new_y
+
+    def write_matplotlib(self, filename):
+        x,y = self.make_matplotlib()
+        x,y = self.remove_duplicate_points(x, y)
+        fig, ax = pyplot.subplots()
+        num_leds = 60
+        x = x[:num_leds]
+        y = y[:num_leds]
+
+        ax.plot(y, x, 'b.')
+        num_to_a_row = 10
+        # make rows
+        sorted_y = [y[i[0]] for i in sorted(enumerate(x), key=lambda lm:lm[1])]
+        sorted_x = sorted(x)
+        slices_x = []
+        slices_y = []
+        for i in range(0, num_leds, num_to_a_row):
+            slice_x = sorted_x[i:i+num_to_a_row]
+            slice_y = sorted_y[i:i+num_to_a_row]
+            slice_x = [slice_x[i[0]] for i in sorted(enumerate(slice_y), key=lambda lm: lm[1])]
+            slice_y = sorted(slice_y)
+            slices_x.append(slice_x)
+            slices_y.append(slice_y)
+        for i in range(len(slices_x)):
+            ax.plot(slices_y[i], slices_x[i], "r--")
+        for i in range(len(slices_x[0])):
+            col_slice_x = [slices_x[j][i] for j in range(len(slices_x)) if i< len(slices_x[j])]
+            col_slice_y = [slices_y[j][i] for j in range(len(slices_y)) if i< len(slices_x[j])]
+            ax.plot(col_slice_y, col_slice_x, "g--")
+
+        lower_lim = 1.1*min([min(x), min(y)])
+        upper_lim = 1.1*max([max(x), max(y)])
+        # make the plot distances the same:
+        ax.set_xlim(lower_lim, upper_lim)
+        ax.set_ylim(lower_lim, upper_lim)
+
+        fig.savefig(filename)
 
     def write_svg(self, filename):
         """ Make and write the SVG for the tiling to filename. """
