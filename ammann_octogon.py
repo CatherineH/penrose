@@ -1,9 +1,8 @@
 # adapted from code originally written by Dr. Maxie Schmidt
-
-
+from copy import copy
 from math import sin, cos, sqrt, pi
 
-from svgwrite.shapes import Polyline
+from functools import cmp_to_key
 
 from tiling import Tiling, vector
 from svgwrite import Drawing
@@ -494,14 +493,76 @@ class Ammann_Tiling(Tiling):
 
 
 if __name__ == "__main__":
-    size=100
-    #view_box = [-x_min, y_min, x_min * 2, y_max - y_min]
-
-    tiles = Ammann_Tiling(4, "square", SQUARE_TILE).get_tiles()
-    dwg = Drawing(filename="amman_tiling.svg")
+    size = 200
+    generations = 3
+    tiles = Ammann_Tiling(generations, "square", SQUARE_TILE).get_tiles()
+    x_values = []
+    y_values = []
     for tile in tiles:
+        for point in tile:
+            x_values.append(point[0]*size)
+            y_values.append(point[1]*size)
+    y_min = min(y_values)
+    y_max = max(y_values)
+    x_min = min(x_values)
+    x_max = max(x_values)
+    triangles = [tile for tile in tiles if len(tile) == 3]
+    squares = []
+    edge_triangles = []
+    # merge the triangles
+    while triangles:
+        triangle = triangles.pop()
+        other_triangles = copy(triangles)
+        other_i = 0
+        while other_triangles:
+            other_triangle = other_triangles.pop()
+            same_points = []
+            corner_points = []
+            comparison_points = triangle+other_triangle
+            comparison_points = sorted(comparison_points, key=cmp_to_key(lambda x, y: x[0]-y[0] if x[0] != y[0] else -x[1]+y[1]))
+            # reduce the points that over top of each other
+            only_unique = [comparison_points[0]]
+            for i in range(1, len(comparison_points)):
+                point = comparison_points[i-1]
+                other_point = comparison_points[i]
+                _dist = ((point[0] - other_point[0]) ** 2.0 + (point[1] - other_point[1]) ** 2.0) ** 0.5
+                if _dist < 0.001:
+                    continue
+                only_unique.append(other_point)
+
+            if len(only_unique) == 4:
+                squares.append(only_unique[:2]+[only_unique[3],only_unique[2]])
+                del triangles[other_i]
+                break
+            other_i += 1
+        edge_triangles.append(triangle)
+
+    rhomboids = [tile for tile in tiles if len(tile) == 4]
+    view_box = [-x_min, y_min, x_min * 2, y_max - y_min]
+
+    dwg = Drawing(filename=f"amman_tiling_{generations}.svg", viewBox="{} {} {} {}".format(*view_box))
+
+    for tile in rhomboids:
         path_string = "M {} {}".format(tile[0][0]*size, tile[0][1]*size)
         for point in tile[1:] + tile[:1]:
             path_string += "L {} {}".format(point[0]*size, point[1]*size)
-        dwg.add(Path(d=path_string, fill="none", stroke="black"))
+        dwg.add(Path(d=path_string, fill="blue", stroke="black", stroke_width=0.1))
+    for tile in squares:
+        path_string = "M {} {}".format(tile[0][0]*size, tile[0][1]*size)
+        for point in tile[1:] + tile[:1]:
+            path_string += "L {} {}".format(point[0]*size, point[1]*size)
+        dwg.add(Path(d=path_string, fill="red", stroke="black", stroke_width=0.1))
+
+    for tile in edge_triangles:
+        path_string = "M {} {}".format(tile[0][0]*size, tile[0][1]*size)
+        for point in tile[1:] + tile[:1]:
+            path_string += "L {} {}".format(point[0]*size, point[1]*size)
+        dwg.add(Path(d=path_string, fill="green", stroke="black", stroke_width=0.1))
+
+    for tile in tiles:
+        path_string = "M {} {}".format(tile[0][0] * size, tile[0][1] * size)
+        for point in tile[1:] + tile[:1]:
+            path_string += "L {} {}".format(point[0] * size, point[1] * size)
+        dwg.add(Path(d=path_string, fill="none", stroke="purple", stroke_width=0.1))
+
     dwg.save()
