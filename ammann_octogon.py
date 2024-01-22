@@ -1,4 +1,5 @@
 # adapted from code originally written by Dr. Maxie Schmidt
+from collections import defaultdict
 from copy import copy
 from math import sin, cos, sqrt, pi
 
@@ -490,12 +491,29 @@ class Ammann_Tiling(Tiling):
             rtiles_list.append(atile.to_points())
 
         return rtiles_list
+class Triangle:
+    id: int
+    points: [array[float]]
 
 
 if __name__ == "__main__":
     size = 200
     generations = 3
+    epsilon = 0.1
     tiles = Ammann_Tiling(generations, "square", SQUARE_TILE).get_tiles()
+
+    # sort all the points in the tiles
+    def xy_sort_function(tile1, tile2):
+        minx1 = min(point[0] for point in tile1)
+        minx2 = min(point[0] for point in tile2)
+        miny1 = min(point[1] for point in tile1)
+        miny2 = min(point[1] for point in tile2)
+        if minx1 == minx2:
+            return miny2-miny1
+        return minx1-minx2
+
+    tiles = sorted(tiles, key=cmp_to_key(xy_sort_function))
+    # sort all the
     x_values = []
     y_values = []
     for tile in tiles:
@@ -526,7 +544,7 @@ if __name__ == "__main__":
                 point = comparison_points[i-1]
                 other_point = comparison_points[i]
                 _dist = ((point[0] - other_point[0]) ** 2.0 + (point[1] - other_point[1]) ** 2.0) ** 0.5
-                if _dist < 0.001:
+                if _dist < epsilon:
                     continue
                 only_unique.append(other_point)
 
@@ -553,16 +571,21 @@ if __name__ == "__main__":
             path_string += "L {} {}".format(point[0]*size, point[1]*size)
         dwg.add(Path(d=path_string, fill="red", stroke="black", stroke_width=0.1))
 
+    """
     for tile in edge_triangles:
         path_string = "M {} {}".format(tile[0][0]*size, tile[0][1]*size)
         for point in tile[1:] + tile[:1]:
             path_string += "L {} {}".format(point[0]*size, point[1]*size)
         dwg.add(Path(d=path_string, fill="green", stroke="black", stroke_width=0.1))
-
+    """
+    counts = defaultdict(int)
     for tile in tiles:
+        id = counts[len(tile)]
+
         path_string = "M {} {}".format(tile[0][0] * size, tile[0][1] * size)
         for point in tile[1:] + tile[:1]:
             path_string += "L {} {}".format(point[0] * size, point[1] * size)
-        dwg.add(Path(d=path_string, fill="none", stroke="purple", stroke_width=0.1))
+        dwg.add(Path(d=path_string, fill="none", stroke="purple", stroke_width=0.5, id=f"{len(tile)}_{id}"))
+        counts[len(tile)] += 1
 
-    dwg.save()
+    dwg.save(pretty=True)
