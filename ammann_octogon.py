@@ -4,6 +4,9 @@ from copy import copy
 from math import sin, cos, sqrt, pi
 
 from functools import cmp_to_key
+from typing import Optional, List, Any
+
+from numpy import array
 
 from tiling import Tiling, vector
 from svgwrite import Drawing
@@ -491,16 +494,55 @@ class Ammann_Tiling(Tiling):
             rtiles_list.append(atile.to_points())
 
         return rtiles_list
+
+
 class Triangle:
     id: int
-    points: [array[float]]
+    points: List[Any]
+    other_triangle_id: Optional[int]
+
+    def __init__(self, id: int, points: List[Any], other_triangle_id: int):
+        self.id = id
+        self.points = points
+        self.other_triangle_id = other_triangle_id
+
+
+class Square:
+    id: int
+    points: List[Any]
+
+    def __init__(self, id: int, points: List[Any]):
+        self.id = id
+        self.points = points
+
+epsilon = 0.1
+def triangles_to_square(comparison_points):
+
+    comparison_points = sorted(comparison_points,
+                               key=cmp_to_key(lambda x, y: x[0] - y[0] if x[0] != y[0] else -x[1] + y[1]))
+    print("comparison_points", comparison_points)
+    # reduce the points that over top of each other
+    only_unique = [comparison_points[0]]
+    for i in range(1, len(comparison_points)):
+        point = comparison_points[i - 1]
+        other_point = comparison_points[i]
+        _dist = ((point[0] - other_point[0]) ** 2.0 + (point[1] - other_point[1]) ** 2.0) ** 0.5
+        if _dist < epsilon:
+            continue
+        only_unique.append(other_point)
+    if len(only_unique) == 4:
+        print("output",only_unique, only_unique[:2] + [only_unique[3], only_unique[2]])
+        return only_unique[:2] + [only_unique[3], only_unique[2]]
+
+
 
 
 if __name__ == "__main__":
     size = 200
     generations = 3
-    epsilon = 0.1
+
     tiles = Ammann_Tiling(generations, "square", SQUARE_TILE).get_tiles()
+
 
     # sort all the points in the tiles
     def xy_sort_function(tile1, tile2):
@@ -509,8 +551,9 @@ if __name__ == "__main__":
         miny1 = min(point[1] for point in tile1)
         miny2 = min(point[1] for point in tile2)
         if minx1 == minx2:
-            return miny2-miny1
-        return minx1-minx2
+            return miny2 - miny1
+        return minx1 - minx2
+
 
     tiles = sorted(tiles, key=cmp_to_key(xy_sort_function))
     # sort all the
@@ -518,41 +561,37 @@ if __name__ == "__main__":
     y_values = []
     for tile in tiles:
         for point in tile:
-            x_values.append(point[0]*size)
-            y_values.append(point[1]*size)
+            x_values.append(point[0] * size)
+            y_values.append(point[1] * size)
     y_min = min(y_values)
     y_max = max(y_values)
     x_min = min(x_values)
     x_max = max(x_values)
-    triangles = [tile for tile in tiles if len(tile) == 3]
+    triangles = [Triangle(id=i, points=tile, other_triangle_id=None) for i, tile in enumerate(tiles) if len(tile) == 3]
     squares = []
     edge_triangles = []
     # merge the triangles
-    while triangles:
-        triangle = triangles.pop()
-        other_triangles = copy(triangles)
-        other_i = 0
-        while other_triangles:
-            other_triangle = other_triangles.pop()
+    for triangle in triangles:
+        if triangle.other_triangle_id:
+            continue # we already know this one
+        for other_triangle in triangles:
+            if other_triangle.id == triangle.id:
+                continue
+            if other_triangle.other_triangle_id:
+                continue
             same_points = []
             corner_points = []
-            comparison_points = triangle+other_triangle
-            comparison_points = sorted(comparison_points, key=cmp_to_key(lambda x, y: x[0]-y[0] if x[0] != y[0] else -x[1]+y[1]))
-            # reduce the points that over top of each other
-            only_unique = [comparison_points[0]]
-            for i in range(1, len(comparison_points)):
-                point = comparison_points[i-1]
-                other_point = comparison_points[i]
-                _dist = ((point[0] - other_point[0]) ** 2.0 + (point[1] - other_point[1]) ** 2.0) ** 0.5
-                if _dist < epsilon:
-                    continue
-                only_unique.append(other_point)
+            comparison_points = triangle.points + other_triangle.points
+            only_unique = triangles_to_square(comparison_points)
+            if triangle.id in [4, 5] and other_triangle.id in [4, 5]:
+                print(triangle.id, other_triangle.id, only_unique)
 
-            if len(only_unique) == 4:
-                squares.append(only_unique[:2]+[only_unique[3],only_unique[2]])
-                del triangles[other_i]
+            if only_unique:
+                print(f"matched {triangle.id} to {other_triangle.id}")
+                squares.append(Square(id=f"{triangle.id}_{other_triangle.id}", points=only_unique))
+                triangle.other_triangle_id = other_triangle.id
+                other_triangle.other_triangle_id = triangle.id
                 break
-            other_i += 1
         edge_triangles.append(triangle)
 
     rhomboids = [tile for tile in tiles if len(tile) == 4]
@@ -561,15 +600,17 @@ if __name__ == "__main__":
     dwg = Drawing(filename=f"amman_tiling_{generations}.svg", viewBox="{} {} {} {}".format(*view_box))
 
     for tile in rhomboids:
-        path_string = "M {} {}".format(tile[0][0]*size, tile[0][1]*size)
+        path_string = "M {} {} ".format(tile[0][0] * size, tile[0][1] * size)
         for point in tile[1:] + tile[:1]:
-            path_string += "L {} {}".format(point[0]*size, point[1]*size)
+            path_string += "L {} {} ".format(point[0] * size, point[1] * size)
         dwg.add(Path(d=path_string, fill="blue", stroke="black", stroke_width=0.1))
     for tile in squares:
-        path_string = "M {} {}".format(tile[0][0]*size, tile[0][1]*size)
-        for point in tile[1:] + tile[:1]:
-            path_string += "L {} {}".format(point[0]*size, point[1]*size)
-        dwg.add(Path(d=path_string, fill="red", stroke="black", stroke_width=0.1))
+        id = tile.id
+        points = tile.points
+        path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
+        for point in points[1:]+[points[0]]:
+            path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+        dwg.add(Path(d=path_string, fill="red", stroke="black", stroke_width=0.1, id=f"square_{id}"))
 
     """
     for tile in edge_triangles:
@@ -579,13 +620,12 @@ if __name__ == "__main__":
         dwg.add(Path(d=path_string, fill="green", stroke="black", stroke_width=0.1))
     """
     counts = defaultdict(int)
-    for tile in tiles:
-        id = counts[len(tile)]
-
-        path_string = "M {} {}".format(tile[0][0] * size, tile[0][1] * size)
-        for point in tile[1:] + tile[:1]:
-            path_string += "L {} {}".format(point[0] * size, point[1] * size)
-        dwg.add(Path(d=path_string, fill="none", stroke="purple", stroke_width=0.5, id=f"{len(tile)}_{id}"))
-        counts[len(tile)] += 1
+    for tile in triangles:
+        id = tile.id
+        points = tile.points
+        path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
+        for point in points[1:] + points[:1]:
+            path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+        dwg.add(Path(d=path_string, fill="none", stroke="purple", stroke_width=0.5, id=f"triangle_{id}"))
 
     dwg.save(pretty=True)
