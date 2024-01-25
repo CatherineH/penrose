@@ -1,9 +1,10 @@
 # adapted from code originally written by Dr. Maxie Schmidt
 from collections import defaultdict
 from copy import copy
-from math import sin, cos, sqrt, pi
+from math import atan, sin, cos, sqrt, pi
 
 from functools import cmp_to_key
+import sys
 from typing import Optional, List, Any
 
 from numpy import array
@@ -517,10 +518,8 @@ class Square:
 
 epsilon = 0.1
 def triangles_to_square(comparison_points):
-
     comparison_points = sorted(comparison_points,
-                               key=cmp_to_key(lambda x, y: x[0] - y[0] if x[0] != y[0] else -x[1] + y[1]))
-    print("comparison_points", comparison_points)
+                               key=cmp_to_key(lambda x, y: x[0] - y[0] if abs(x[0] - y[0]) > epsilon else -x[1] + y[1]))
     # reduce the points that over top of each other
     only_unique = [comparison_points[0]]
     for i in range(1, len(comparison_points)):
@@ -531,15 +530,31 @@ def triangles_to_square(comparison_points):
             continue
         only_unique.append(other_point)
     if len(only_unique) == 4:
-        print("output",only_unique, only_unique[:2] + [only_unique[3], only_unique[2]])
-        return only_unique[:2] + [only_unique[3], only_unique[2]]
+        only_unique = only_unique[:2] + [only_unique[3], only_unique[2]]
+    else:
+        return None
+    if is_square(only_unique):
+        return only_unique
 
+def is_square(coordinates):
+    distances = []
+    for i in range(len(coordinates)):
+        point1 = coordinates[i]
+        point2 = coordinates[(i+1) % len(coordinates)]
+        distance = ((point1[0] - point2[0]) ** 2.0 + (point1[1] - point2[1]) ** 2.0) ** 0.5
+        distances.append(distance)
+    angle = atan((coordinates[0][1]-coordinates[1][1])/(coordinates[0][0]-coordinates[1][0]))- atan((coordinates[2][1]-coordinates[1][1])/(coordinates[2][0]-coordinates[1][0]))
+    
+    if abs(angle-(pi/2.0)) > epsilon:
+        return False
+    differences = [abs(distances[i] - distances[i-1]) for i in range(1, len(distances)) if abs(distances[i] - distances[i-1]) > epsilon/2]
+    return not len(differences) > 0
 
 
 
 if __name__ == "__main__":
     size = 200
-    generations = 3
+    generations = 4
 
     tiles = Ammann_Tiling(generations, "square", SQUARE_TILE).get_tiles()
 
@@ -582,12 +597,14 @@ if __name__ == "__main__":
             same_points = []
             corner_points = []
             comparison_points = triangle.points + other_triangle.points
+            if triangle.id in [259, 258] and other_triangle.id in [259, 258]:
+                print(triangle.id, other_triangle.id, comparison_points)
             only_unique = triangles_to_square(comparison_points)
-            if triangle.id in [4, 5] and other_triangle.id in [4, 5]:
-                print(triangle.id, other_triangle.id, only_unique)
+            
 
             if only_unique:
                 print(f"matched {triangle.id} to {other_triangle.id}")
+                
                 squares.append(Square(id=f"{triangle.id}_{other_triangle.id}", points=only_unique))
                 triangle.other_triangle_id = other_triangle.id
                 other_triangle.other_triangle_id = triangle.id
