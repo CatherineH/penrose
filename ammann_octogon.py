@@ -516,12 +516,14 @@ class Square:
         self.id = id
         self.points = points
 
-epsilon = 0.1
-def triangles_to_square(comparison_points):
+epsilon = 0.05
+def triangles_to_square(comparison_points, debug=False):
     comparison_points = sorted(comparison_points,
                                key=cmp_to_key(lambda x, y: x[0] - y[0] if abs(x[0] - y[0]) > epsilon else -x[1] + y[1]))
     # reduce the points that over top of each other
     only_unique = [comparison_points[0]]
+    if debug:
+        print(f"after sorting: {comparison_points}")
     for i in range(1, len(comparison_points)):
         point = comparison_points[i - 1]
         other_point = comparison_points[i]
@@ -531,30 +533,55 @@ def triangles_to_square(comparison_points):
         only_unique.append(other_point)
     if len(only_unique) == 4:
         only_unique = only_unique[:2] + [only_unique[3], only_unique[2]]
-    else:
-        return None
-    if is_square(only_unique):
-        return only_unique
 
-def is_square(coordinates):
+    else:
+        if debug:
+            print(f"only_unique points: {len(only_unique)}")
+        return None
+    if is_square(only_unique, debug):
+        
+        return only_unique
+    if debug:
+        print(f"{only_unique} was not square!")
+
+def is_square(coordinates, debug=False):
+    if debug:
+        print(f"is_square: {coordinates}")
     distances = []
     for i in range(len(coordinates)):
         point1 = coordinates[i]
         point2 = coordinates[(i+1) % len(coordinates)]
         distance = ((point1[0] - point2[0]) ** 2.0 + (point1[1] - point2[1]) ** 2.0) ** 0.5
         distances.append(distance)
-    angle = atan((coordinates[0][1]-coordinates[1][1])/(coordinates[0][0]-coordinates[1][0]))- atan((coordinates[2][1]-coordinates[1][1])/(coordinates[2][0]-coordinates[1][0]))
-    
-    if abs(angle-(pi/2.0)) > epsilon:
+    if debug:
+        print(f"distances {distances}")
+    dx1 = coordinates[0][0]-coordinates[1][0]
+    dy1 = coordinates[0][1]-coordinates[1][1]
+    dx2 = coordinates[2][0]-coordinates[1][0]
+    dy2 = coordinates[2][1]-coordinates[1][1]
+    angle = 0
+    if dx1 != 0:
+        angle += atan(dy1/dx1)
+    else:
+        angle += pi/2.0 if dy1 > 0 else -pi/2.0
+    if dx2 != 0:
+        angle -= atan(dy2/dx2)
+    else:
+        angle += pi/2.0 if dy2 > 0 else -pi/2.0
+    if abs(abs(angle)-(pi/2.0)) > epsilon:
+        if debug:
+            print(f"angle not 90 degrees {angle}")
         return False
-    differences = [abs(distances[i] - distances[i-1]) for i in range(1, len(distances)) if abs(distances[i] - distances[i-1]) > epsilon/2]
+    differences = [abs(distances[i] - distances[i-1]) for i in range(1, len(distances)) if abs(distances[i] - distances[i-1]) > epsilon/3]
+    if debug:
+        print(f"is square? {len(differences)} ")
     return not len(differences) > 0
 
 
 
 if __name__ == "__main__":
     size = 200
-    generations = 4
+    generations = 5
 
     tiles = Ammann_Tiling(generations, "square", SQUARE_TILE).get_tiles()
 
@@ -584,6 +611,7 @@ if __name__ == "__main__":
     x_max = max(x_values)
     triangles = [Triangle(id=i, points=tile, other_triangle_id=None) for i, tile in enumerate(tiles) if len(tile) == 3]
     squares = []
+    debug_target = [1578, 1684]
     edge_triangles = []
     # merge the triangles
     for triangle in triangles:
@@ -597,11 +625,16 @@ if __name__ == "__main__":
             same_points = []
             corner_points = []
             comparison_points = triangle.points + other_triangle.points
-            if triangle.id in [259, 258] and other_triangle.id in [259, 258]:
+            debug = False
+            if triangle.id in debug_target and other_triangle.id in debug_target:
                 print(triangle.id, other_triangle.id, comparison_points)
-            only_unique = triangles_to_square(comparison_points)
+                debug = True
+            only_unique = triangles_to_square(comparison_points, debug)
             
-
+            if triangle.id in debug_target and other_triangle.id in debug_target:
+                if not only_unique:
+                    sys.exit()
+            
             if only_unique:
                 print(f"matched {triangle.id} to {other_triangle.id}")
                 
