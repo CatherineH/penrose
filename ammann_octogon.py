@@ -7,6 +7,8 @@ from functools import cmp_to_key
 import sys
 from typing import Optional, List, Any
 
+from numpy import mean
+
 from tiling import Tiling, vector
 from svgwrite import Drawing
 from svgwrite.path import Path
@@ -37,7 +39,6 @@ class AmmannTile(object):
     # Initialization function for the AmmannTile class
     # @param x, y, z, w Coordinates for the vertices of the
     #                   rhombic, triangular, or square shaped tile
-    #
     def __init__(self, tile_type, x, y, z, w=vector([0, 0])):
         self.tile_type = tile_type
         self.x = x
@@ -47,17 +48,14 @@ class AmmannTile(object):
 
     # to_points
     # Returns a list of the tile's 2D vertex points
-    #
     def to_points(self):
         if self.tile_type == SQUARE_TILE or self.tile_type == RHOMB_TILE:
             return [self.x, self.y, self.z, self.w]
         else:
             return [self.x, self.y, self.z]
 
-    # to_subtiles_square
     # Returns a list of tiles corresponding to one substitution step
     # forward for this specific tile
-    #
     def to_subtiles_square(self):
         x, y, z, w = self.x, self.y, self.z, self.w
         c1 = x + (d1 * (y - x) + w - x) / d2
@@ -79,10 +77,8 @@ class AmmannTile(object):
             AmmannTile(TRIANGLE_TILE, z, y + c4, c1 + c5),
         ]
 
-    # to_subtiles_rhomb
     # Returns a list of tiles corresponding to one substitution step
     # forward for this specific tile
-    #
     def to_subtiles_rhomb(self):
         x, y, z, w = self.x, self.y, self.z, self.w
         c1 = x + d1 * (y - x)
@@ -101,10 +97,8 @@ class AmmannTile(object):
             AmmannTile(TRIANGLE_TILE, w, x + c2, c1 + c2),
         ]
 
-    # to_subtiles_triangle
     # Returns a list of tiles corresponding to one substitution step
     # forward for this specific tile
-    #
     def to_subtiles_triangle(self):
         x, y, z = self.x, self.y, self.z
         c1 = x + d1 * (y - x) / d2
@@ -119,13 +113,11 @@ class AmmannTile(object):
             AmmannTile(TRIANGLE_TILE, z, x + c3, c1 + c3),
         ]
 
-    # to_subtiles
     # Returns a list of tiles corresponding to one substitution step
     # forward for this tile (which corresponds to one of the tile shapes)
     # @see AmmannTile.to_subtiles_square
     # @see AmmannTile.to_subtiles_rhomb
     # @see AmmannTile.to_subtiles_triangle
-    #
     def to_subtiles(self):
         if self.tile_type == SQUARE_TILE:
             return self.to_subtiles_square()
@@ -134,9 +126,7 @@ class AmmannTile(object):
         else:
             return self.to_subtiles_triangle()
 
-    # get_initial_rhomb
     # Static method that returns an initially rhombic tile
-    #
     @staticmethod
     def get_initial_rhomb():
         return [
@@ -526,19 +516,24 @@ class Rhombus:
 epsilon = 0.05
 
 
-def triangles_to_square(comparison_points, debug=False):
+def triangles_to_square(comparison_points, expected_size=1.0, debug=False):
     comparison_points = sorted(comparison_points,
-                               key=cmp_to_key(lambda x, y: x[0] - y[0] if abs(x[0] - y[0]) > epsilon else -x[1] + y[1]))
+                               key=cmp_to_key(lambda x, y: x[0] - y[0] if abs(x[0] - y[0]) > epsilon*expected_size else -x[1] + y[1]))
     # reduce the points that over top of each other
     only_unique = [comparison_points[0]]
     if debug:
+        print(f"expected_size {expected_size}")
         print(f"after sorting: {comparison_points}")
     for i in range(1, len(comparison_points)):
         point = comparison_points[i - 1]
         other_point = comparison_points[i]
         _dist = ((point[0] - other_point[0]) ** 2.0 + (point[1] - other_point[1]) ** 2.0) ** 0.5
-        if _dist < epsilon:
+        if _dist < epsilon * expected_size:
             continue
+        else:
+            if debug:
+                print(f"distance: {_dist}")
+
         only_unique.append(other_point)
     if len(only_unique) == 4:
         only_unique = only_unique[:2] + [only_unique[3], only_unique[2]]
@@ -553,6 +548,10 @@ def triangles_to_square(comparison_points, debug=False):
         print(f"{only_unique} was not square!")
 
 
+def distance(point1, point2):
+    return ((point1[0] - point2[0]) ** 2.0 + (point1[1] - point2[1]) ** 2.0) ** 0.5
+
+
 def is_square(coordinates, debug=False):
     if debug:
         print(f"is_square: {coordinates}")
@@ -560,8 +559,7 @@ def is_square(coordinates, debug=False):
     for i in range(len(coordinates)):
         point1 = coordinates[i]
         point2 = coordinates[(i + 1) % len(coordinates)]
-        distance = ((point1[0] - point2[0]) ** 2.0 + (point1[1] - point2[1]) ** 2.0) ** 0.5
-        distances.append(distance)
+        distances.append(distance(point1, point2))
     if debug:
         print(f"distances {distances}")
     dx1 = coordinates[0][0] - coordinates[1][0]
@@ -603,11 +601,16 @@ def are_neighbors(points1, points2):
                 return True
 
 
+def mean_size(tiles):
+    return mean([distance(tile[i - 1], tile[i]) for tile in tiles for i in range(len(tile))])
+
+
 if __name__ == "__main__":
     size = 200
     generations = 5
 
     tiles = Ammann_Tiling(generations, "square", SQUARE_TILE).get_tiles()
+
 
     # sort all the points in the tiles
     def xy_sort_function(tile1, tile2):
@@ -622,6 +625,8 @@ if __name__ == "__main__":
 
     tiles = sorted(tiles, key=cmp_to_key(xy_sort_function))
 
+    average_size_length = mean_size(tiles)
+
     x_values = []
     y_values = []
     for tile in tiles:
@@ -634,7 +639,7 @@ if __name__ == "__main__":
     x_max = max(x_values)
     triangles = [Triangle(id=i, points=tile) for i, tile in enumerate(tiles) if len(tile) == 3]
     squares = []
-    debug_target = []
+    debug_target = [52, 53]
     edge_triangles = []
     # merge the triangles
     for triangle in triangles:
@@ -652,7 +657,7 @@ if __name__ == "__main__":
             if triangle.id in debug_target and other_triangle.id in debug_target:
                 print(triangle.id, other_triangle.id, comparison_points)
                 debug = True
-            only_unique = triangles_to_square(comparison_points, debug)
+            only_unique = triangles_to_square(comparison_points, expected_size=average_size_length, debug=debug)
 
             if triangle.id in debug_target and other_triangle.id in debug_target:
                 if not only_unique:
@@ -670,67 +675,62 @@ if __name__ == "__main__":
     rhomboids = [tile for tile in tiles if len(tile) == 4]
     view_box = [-x_min, y_min, x_min * 2, y_max - y_min]
     rhomboids = [Rhombus(id=i, points=rhomboids[i]) for i in range(len(rhomboids))]
+    draw_debug = False
+    if len(squares) / len(rhomboids) < 0.48:
+        print("something went wrong. Generating debug svg")
+        draw_debug = True
     dwg = Drawing(filename=f"amman_tiling_{generations}.svg", viewBox="{} {} {} {}".format(*view_box))
 
-    """
-    for tile in rhomboids:
-        path_string = "M {} {} ".format(tile[0][0] * size, tile[0][1] * size)
-        for point in tile[1:] + tile[:1]:
-            path_string += "L {} {} ".format(point[0] * size, point[1] * size)
-        dwg.add(Path(d=path_string, fill="blue", stroke="black", stroke_width=0.1))
-    for tile in squares:
-        id = tile.id
-        points = tile.points
-        path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
-        for point in points[1:] + [points[0]]:
-            path_string += "L {} {} ".format(point[0] * size, point[1] * size)
-        dwg.add(Path(d=path_string, fill="red", stroke="black", stroke_width=0.1, id=f"square_{id}"))
-    for tile in edge_triangles:
-        path_string = "M {} {}".format(tile[0][0]*size, tile[0][1]*size)
-        for point in tile[1:] + tile[:1]:
-            path_string += "L {} {}".format(point[0]*size, point[1]*size)
-        dwg.add(Path(d=path_string, fill="green", stroke="black", stroke_width=0.1))
-    
-    counts = defaultdict(int)
-    for tile in triangles:
-        id = tile.id
-        points = tile.points
-        path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
-        for point in points[1:] + points[:1]:
-            path_string += "L {} {} ".format(point[0] * size, point[1] * size)
-        dwg.add(Path(d=path_string, fill="none", stroke="purple", stroke_width=0.5, id=f"triangle_{id}"))
-    """
+    if draw_debug:
+        for tile in squares + rhomboids:
+            id = tile.id
+            points = tile.points
+            path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
+            for point in points[1:] + [points[0]]:
+                path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+            dwg.add(Path(d=path_string, fill="red", stroke="black", stroke_width=0.1, id=f"{type(tile).__name__}_{id}"))
 
-    adjacency_matrix = defaultdict(list)
-    final_shapes = squares + rhomboids
-    for i, shape1 in enumerate(final_shapes):
-        for j, shape2 in enumerate(final_shapes):
-            if i == j:
-                continue
-            if i in adjacency_matrix[j] or j in adjacency_matrix[i]:
-                continue
-            if are_neighbors(shape1.points, shape2.points):
-                adjacency_matrix[i].append(j)
-                adjacency_matrix[j].append(i)
-    num_colors = 4
-    colors = [i for i in range(num_colors)]
-    print(adjacency_matrix)
+        counts = defaultdict(int)
+        for tile in triangles:
+            id = tile.id
+            points = tile.points
+            path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
+            for point in points[1:] + points[:1]:
+                path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+            dwg.add(Path(d=path_string, fill="none", stroke="purple", stroke_width=0.5, id=f"triangle_{id}"))
+    else:
 
-    problem = Problem()
-    for i in range(len(final_shapes)):
-        problem.addVariable(f"{i}", colors)
-    for i in range(len(final_shapes)):
-        for neighbor in adjacency_matrix[i]:
-            problem.addConstraint(lambda a, b: a != b, (str(neighbor), str(i)))
-    coloring = problem.getSolution()
-    if not coloring:
-        print("no coloring solutions were found!")
-    color_names = ["red", "green", "blue", "yellow", "purple", "orange"]
-    for i, shape in enumerate(final_shapes):
-        id = shape.id
-        points = shape.points
-        path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
-        for point in points[1:] + points[:1]:
-            path_string += "L {} {} ".format(point[0] * size, point[1] * size)
-        dwg.add(Path(d=path_string, fill=color_names[coloring[str(i)]], id=f"{type(shape).__name__}_{id}"))
+        adjacency_matrix = defaultdict(list)
+        final_shapes = squares + rhomboids
+        for i, shape1 in enumerate(final_shapes):
+            for j, shape2 in enumerate(final_shapes):
+                if i == j:
+                    continue
+                if i in adjacency_matrix[j] or j in adjacency_matrix[i]:
+                    continue
+                if are_neighbors(shape1.points, shape2.points):
+                    adjacency_matrix[i].append(j)
+                    adjacency_matrix[j].append(i)
+        num_colors = 4
+        colors = [i for i in range(num_colors)]
+        print(adjacency_matrix)
+
+        problem = Problem()
+        for i in range(len(final_shapes)):
+            problem.addVariable(f"{i}", colors)
+        for i in range(len(final_shapes)):
+            for neighbor in adjacency_matrix[i]:
+                problem.addConstraint(lambda a, b: a != b, (str(neighbor), str(i)))
+        coloring = problem.getSolution()
+        if not coloring:
+            print("no coloring solutions were found!")
+        color_names = ["red", "green", "blue", "yellow", "purple", "orange"]
+        for i, shape in enumerate(final_shapes):
+            id = shape.id
+            points = shape.points
+            path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
+            for point in points[1:] + points[:1]:
+                path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+            dwg.add(Path(d=path_string, fill=color_names[coloring[str(i)]], id=f"{type(shape).__name__}_{id}"))
     dwg.save(pretty=True)
+    print(f"there were {len(squares)} squares and {len(rhomboids)} rhomboids")
