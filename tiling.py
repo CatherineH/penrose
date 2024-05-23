@@ -24,8 +24,6 @@ def matrix(input: List[List[float]]) -> List[List[float]]:
 
 def midpoint(A, B): return (A + B) / 2.0
 
-def length(A, B):
-    return ((A[0]-B[0])**2 + (A[1]-B[1])**2)**0.5
 
 def midpoint2(t, A, B): return (1 - float(t)) * A + float(t) * B
 
