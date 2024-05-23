@@ -1,9 +1,15 @@
 # adapted from code originally written by Dr. Maxie Schmidt
 from copy import copy
 from typing import List
+from functools import cmp_to_key
+from numpy import array, mean
+from math import sin, cos, pi, atan2
+from collections import defaultdict
+from constraint import Problem
 
-from numpy import array
-from math import sin, cos, pi
+
+from svgwrite import Drawing
+from svgwrite.path import Path
 
 __major_version__ = "0.0"
 __release__ = "1"
@@ -12,6 +18,13 @@ __version__ = "%s.%s" % (__major_version__, __release__)
 NUMCPUS = 8
 FPNUM_DIGITS = 6
 
+#
+# Python constants denoting three of the initial tile shapes
+#
+RHOMB_TILE = 1
+TRIANGLE_TILE = 2
+SQUARE_TILE = 3
+STAR_TILE = 4
 
 
 def vector(coord: List[float]) -> List[float]:
@@ -22,30 +35,47 @@ def matrix(input: List[List[float]]) -> List[List[float]]:
     return array(input)
 
 
-def midpoint(A, B): return (A + B) / 2.0
+def midpoint(A, B):
+    return (A + B) / 2.0
 
 
-def midpoint2(t, A, B): return (1 - float(t)) * A + float(t) * B
+def midpoint2(t, A, B):
+    return (1 - float(t)) * A + float(t) * B
 
 
-def RotationMatrix(theta): return matrix([[cos(theta), -1 * sin(theta)], \
-                                          [sin(theta), cos(theta)]])
+def RotationMatrix(theta):
+    return matrix([[cos(theta), -1 * sin(theta)], [sin(theta), cos(theta)]])
 
 
-def round_coordinate(coord): return round(coord, FPNUM_DIGITS)
+def round_coordinate(coord):
+    return round(coord, FPNUM_DIGITS)
 
 
-def round_vector(v): return V(round_coordinate(X(v)), round_coordinate(Y(v)))
+def round_vector(v):
+    return V(round_coordinate(X(v)), round_coordinate(Y(v)))
 
 
 def filter_nonzero(gaplst, round_prec=0.0001):
     return list(filter(lambda gap: abs(gap) > round_prec, gaplst))
 
 
-def add(A:vector, B:vector) -> vector:
-    return vector([A[0]+B[0], A[1]+B[1]])
+def add(A: vector, B: vector) -> vector:
+    return vector([A[0] + B[0], A[1] + B[1]])
+
+
+def project(
+    endpoint: vector, startpoint: vector, angle: float, length: float
+) -> vector:
+    # project a point based on a vector and an angle and length
+    beta = atan2(endpoint[1] - startpoint[1], endpoint[0] - startpoint[0])
+    new_angle = angle + beta
+    x1 = length * cos(new_angle)
+    y1 = length * sin(new_angle)
+    return vector([startpoint[0] + x1, startpoint[1] + y1])
+
 
 ##
+
 
 def get_solutionsXY(solns):
     if solns == None:
@@ -53,11 +83,6 @@ def get_solutionsXY(solns):
     XYsol_func = lambda i: [solns[i][0].rhs().real, solns[i][1].rhs().real]
     XYsols = map(XYsol_func, range(0, len(solns)))
     return XYsols
-
-
-
-
-
 
 
 ## edist
@@ -75,6 +100,7 @@ def edist(p0, p1=[0, 0], sqpow=0.5):
 
 ##def
 
+
 ## sort_points_complex
 # Sorts a list of 2D points, or tuples, using the numpy sort_complex routine
 # @param points_list A list of 2D points
@@ -88,7 +114,6 @@ def sort_points_complex(points_list):
         x, y = p[0], p[1]
         cp = np.complex(x, y)
         complex_points.append(cp)
-        
 
     complex_points = list(np.sort_complex(complex_points))
 
@@ -96,10 +121,8 @@ def sort_points_complex(points_list):
     for cp in complex_points:
         re, im = cp.real, cp.imag
         points_list.append(vector([re, im]))
-        
+
     return points_list
-
-
 
 
 ## sort_points_1D
@@ -110,8 +133,6 @@ def sort_points_complex(points_list):
 ##
 def sort_points_1D(points_list, sort_by_ycoords=False):
     return list(np.sort(points_list))
-
-
 
 
 ## unique_points
@@ -148,8 +169,6 @@ def unique_points(points_list, perform_sort=True):
     return points_list
 
 
-
-
 ## unique_points_1D
 # Determines the unique 1D elements contained in the list
 # @param points_list  A list of 1D (i.e., no tuples) elements
@@ -183,14 +202,11 @@ def unique_points_1D(points_list, perform_sort=True):
     return points_list
 
 
-
-
 ## Tiling
 # A super class intended to generate derived individual tiling classes
 # implemented in the program
 ##
 class Tiling(object):
-
     ## __init__
     # The initialization function for the Tiling class
     # @param num_steps_N     Parameter number of substitution or replacement
@@ -200,7 +216,7 @@ class Tiling(object):
     def __init__(self, num_steps_N, tiling_name_str):
         self.num_steps = num_steps_N
         self.tiling_name = tiling_name_str
-        
+        self.tiles = []
 
     ## N
     # Provides access to the num_steps property of the tiling
@@ -225,15 +241,6 @@ class Tiling(object):
     def desc(self):
         return "<Tiling Description>"
 
-        ## get_initial_tile
-
-    # Returns the initial tile before performing N stages of the
-    # substitution routines
-    # (intended to be overridden by the sub-classes)
-    ##
-    def get_initial_tile(self):
-        return []
-
         ## get_tiles
 
     # Computes the polygon tiles (list of list of 2D vectors) of the
@@ -243,236 +250,193 @@ class Tiling(object):
     def get_tiles(self):
         return []
 
-        ## get_tile_color
+    # Returns the only tile in the tiling after zero steps
+    #
+    def get_initial_tile(self):
+        return self.INIT_TILE
 
-    # Returns the color of the tile polygon
-    # @param tile Always ignored (could be re-written to use the tile's shape)
-    ##
-    def get_tile_color(self, tile):
-        return 'lightblue'
+        # get_next_tiling
 
-        ## get_tile_edge_color
+    # Gets the next list of tiles after one subsequent substitution step
+    # @param prev_tiles        A list of the tiles after one step back
+    # @return                  A list of tiles after one more step
+    #
+    def get_next_tiling(self, prev_tiles):
+        next_tiles = []
+        for tile in prev_tiles:
+            subtiles = tile.to_subtiles()
+            next_tiles.extend(subtiles)
 
-    # Returns the border color between tiles in the images of the tiling
-    ##
-    def get_tile_edge_color(self):
-        return 'darkgray'
+        return next_tiles
 
-        ## get_tiling_image
+    # get_tiles
+    # Gets the polygonal Ammann tiles after N steps
+    # @return A list of tiles in the computed substitution tiling
+    #
+    def get_tiles(self):
+        tile_list = self.get_initial_tile()
+        for n in range(1, self.N):
+            next_tiles_list = self.get_next_tiling(tile_list)
+            tile_list = next_tiles_list
 
-    # Shows an image of the tiling specified by a list of polygonal tiles
-    # @param tiles A list of polygonal tiles (list of 2D vectors)
-    # @return      An image of the tiling
-    # @see         Tiling.get_tile_color
-    # @see         Tiling.get_tile_edge_color
-    ##
-    def get_tiling_image(self, tiles):
+        rtiles_list = []
+        for idx, atile in enumerate(tile_list):
+            rtiles_list.append(atile)
 
-        tile_graph = Graphics()
-        edge_color = self.get_tile_edge_color()
-        for (idx, tile) in enumerate(tiles):
-            tile_color = self.get_tile_color(tile)
-            tile_graph += polygon(tile, color=tile_color, edgecolor=edge_color)
-            
+        return rtiles_list
 
-        ## plot tiling points in addition to the polygons corresponding to each tile:
-        for (idx, tile) in enumerate(tiles):
-            for (idx2, tp) in enumerate(tile):
-                tile_graph += point(tp, color='darkblue')
-            
-        
+    def gen_svg(self):
+        size = 200
+        [x_min, x_max, y_min, y_max] = get_bounding_box(self.tiles, size)
+        view_box = [-x_min, y_min, x_min * 2, y_max - y_min]
+        squares = [tile for tile in self.tiles if tile.tile_type == SQUARE_TILE]
+        rhomboids = [tile for tile in self.tiles if tile.tile_type == RHOMB_TILE]
+        triangles = [tile for tile in self.tiles if tile.tile_type == TRIANGLE_TILE]
+        dwg = Drawing(
+            filename=f"{self.name()}_{self.num_steps}.svg",
+            viewBox="{} {} {} {}".format(*view_box),
+        )
 
-        tile_graph.show()
-        return tile_graph
+        if self.draw_debug:
+            for tile in squares + rhomboids:
+                id = tile.id
+                points = tile.points
+                path_string = "M {} {} ".format(
+                    points[0][0] * size, points[0][1] * size
+                )
+                for point in points[1:] + [points[0]]:
+                    path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+                dwg.add(
+                    Path(
+                        d=path_string,
+                        fill="red",
+                        stroke="black",
+                        stroke_width=0.1,
+                        id=f"{type(tile).__name__}_{id}",
+                    )
+                )
 
-        
+            counts = defaultdict(int)
+            for tile in triangles:
+                id = tile.id
+                points = tile.points
+                path_string = "M {} {} ".format(
+                    points[0][0] * size, points[0][1] * size
+                )
+                for point in points[1:] + points[:1]:
+                    path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+                dwg.add(
+                    Path(
+                        d=path_string,
+                        fill="none",
+                        stroke="purple",
+                        stroke_width=0.5,
+                        id=f"triangle_{id}",
+                    )
+                )
+        else:
+            adjacency_matrix = defaultdict(list)
+            final_shapes = squares + rhomboids
+            for i, shape1 in enumerate(final_shapes):
+                for j, shape2 in enumerate(final_shapes):
+                    if i == j:
+                        continue
+                    if i in adjacency_matrix[j] or j in adjacency_matrix[i]:
+                        continue
+                    if are_neighbors(shape1.points, shape2.points):
+                        adjacency_matrix[i].append(j)
+                        adjacency_matrix[j].append(i)
+            num_colors = 4
+            colors = [i for i in range(num_colors)]
+            print(adjacency_matrix)
 
-    ## transform_points
-    # Applies an affine transformation to a list of points
-    # @param points_list A list of points
-    # @param op          An AffineTransformOp object representing the
-    #                    transformation
-    # @return            A list of transformed points
-    ##
-    @staticmethod
-    def transform_points(points_list, op):
-        tfunc = lambda pt: op.apply_to_point(pt)
-        next_points_list = map(tfunc, points_list)
-        return next_points_list
-        
-
-    ## transform_full_points_list
-    # Transforms all points in a list of lists of points
-    # @param full_points_list A list of lists of 2D vectors
-    # @param op               An AffineTransformOp object
-    # @return                 A list of lists of transformed points
-    ##
-    @staticmethod
-    def transform_full_points_list(full_points_list, op):
-        tfunc_helper = lambda pt: Tiling.transform_points(pt, op)
-        next_full_points_list = map(tfunc_helper, full_points_list)
-        return next_full_points_list
-        
-
-    ## tiling_to_points
-    # Extracts the individual points from a list of polygonal tiles
-    # @param tiles
-    # @param get_unique An optional parameter for whether to compute a list
-    #                   of only the distinct points in the tiling
-    #                   (i.e., since the tiles may contain overlapping points)
-    # @return           A list of 2D vectors corresponding to the tiling
-    #                   vertices in the tiles
-    ##
-    @staticmethod
-    def tiling_to_points(tiles, get_unique=True):
-        tiling_points = []
-        for (idx, tile) in enumerate(tiles):
-            tiling_points.extend(tile)
-            
-        if get_unique:
-            tiling_points = unique_points(tiling_points, perform_sort=True)
-            ## if
-        return tiling_points
-        
-
-    ## compute_pc_edists
-    # Computes the pair correlation data points, or a list of the O(n^2)
-    # Euclidean distances between distinct points in the tiling
-    # @param tiling_points A list of 2D tiling point vectors
-    # @param edist_squared An optional parameter denoting whether to square
-    #                      the returned distances
-    # @param sort_edists   An optional parameter specifying whether to
-    #                      sort the computed list before returning it
-    # @return              A list of the pair correlation distance data
-    ##
-    @staticmethod
-    def compute_pc_edists(tiling_points, edist_squared=False, sort_edists=False):
-
-        edist_pow = 0.5
-        if edist_squared:
-            edist_pow = 1.0
-            ## if
-
-        edists = []
-        for pt1 in tiling_points:
-            for pt2 in tiling_points:
-                next_edist = edist(pt1, pt2, edist_pow)
-                if next_edist != 0.0:
-                    edists.append(next_edist)
-                    
-        
-
-        if sort_edists:
-            edists = sort_points_1D(edists)
-            ## if
-
-        return edists
-
-        
-
-    ## compute_sorted_angles
-    # Computes a list of sorted angles, arctan(y/x) for each point (x, y),
-    # of each point in the tiling
-    # @param tiling_points A list of 2D vectors representing the tiling
-    # @return              A list of angles of the tiling points
-    ##
-    @staticmethod
-    def compute_sorted_angles(tiling_points):
-
-        angles = []
-        for xyv in tiling_points:
-            x, y = xyv[0], xyv[1]
-            angle = math.atan2(y, x) / (2 * pifp)
-            angles.append(angle)
-            
-        # angles = unique_points_1D(angles, perform_sort = True)
-        # angles = list(np.sort(np.unique(angles)))
-        angles = sorted(list(angles))
-        return angles
-
-        
-
-    ## compute_angle_gaps
-    # Computes the gaps between the sorted angles of a list of tiling points
-    # @param tiling_points A list of 2D vectors representing tiling points
-    # @return              The angle gap distribution data of the differences
-    #                      between neighboring points in the sorted angle list
-    ##
-    @staticmethod
-    def compute_angle_gaps(tiling_points):
-
-        angles = Tiling.compute_sorted_angles(tiling_points)
-        # normalize_factor = len(angles)
-        normalize_factor = 1.0
-        # normalize_factor = 1.0 / float(len(angles))
-        angle_gaps = []
-        for i in range(1, len(angles)):
-            gap = (angles[i] - angles[i - 1]) / normalize_factor
-            angle_gaps.append(gap)
-            
-        angle_gaps = filter_nonzero(angle_gaps)
-        return angle_gaps
-
-    
-
-    ## compute_sorted_slopes
-    # Computes a sorted list of slopes (y/x for each point (x, y)) in a
-    # list of tiling points
-    # @param tiling_points A list of 2D vectors
-    # @return              A sorted list of tiling point slopes
-    ##
-    @staticmethod
-    def compute_sorted_slopes(tiling_points):
-
-        slopes = []
-        for xyv in tiling_points:
-            x, y = xyv[0], xyv[1]
-            if x != 0:
-                slopes.append(y / float(x))
-                
-        # slopes = unique_points_1D(slopes, perform_sort = True)
-        # slopes = sorted(list(np.unique(slopes)))
-        slopes = sorted(list(slopes))
-        return slopes
-
-        
-
-    ## compute_slope_gaps
-    # Computes the gaps between the sorted slopes of a list of tiling points
-    # @param tiling_points A list of 2D vectors representing tiling points
-    # @return              The slope gap distribution data of the differences
-    #                      between neighboring points in the sorted slope list
-    ##
-    @staticmethod
-    def compute_slope_gaps(tiling_points, h=1):
-
-        slopes = Tiling.compute_sorted_slopes(tiling_points)
-        normalize_factor = 1.0
-        # normalize_factor = 1 / (250.0 ** 2)
-        # normalize_factor = 1 / float(len(tiling_points))
-        slope_gaps = []
-        for i in range(h, len(slopes)):
-            gap = (slopes[i] - slopes[i - h]) / normalize_factor
-            slope_gaps.append(gap)
-            
-        slope_gaps = filter_nonzero(slope_gaps)
-        return slope_gaps
-
-    
-
-    @staticmethod
-    def compute_joint_slope_gaps(tiling_points, h1, h2):
-
-        slopes = Tiling.compute_sorted_slopes(tiling_points)
-        normalize_factor = 1.0
-        slope_gaps = []
-        for i in range(max(h1, h2), len(slopes)):
-            gap_coord1 = (slopes[i] - slopes[i - h1]) / normalize_factor
-            gap_coord2 = (slopes[i] - slopes[i - h2]) / normalize_factor
-            slope_gaps.append((gap_coord1, gap_coord2))
-            
-        return slope_gaps
-
-    
+            problem = Problem()
+            for i in range(len(final_shapes)):
+                problem.addVariable(f"{i}", colors)
+            for i in range(len(final_shapes)):
+                for neighbor in adjacency_matrix[i]:
+                    problem.addConstraint(lambda a, b: a != b, (str(neighbor), str(i)))
+            coloring = problem.getSolution()
+            if not coloring:
+                print("no coloring solutions were found!")
+            color_names = ["red", "green", "blue", "yellow", "purple", "orange"]
+            for i, shape in enumerate(final_shapes):
+                id = shape.id
+                points = shape.points
+                path_string = "M {} {} ".format(
+                    points[0][0] * size, points[0][1] * size
+                )
+                for point in points[1:] + points[:1]:
+                    path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+                dwg.add(
+                    Path(
+                        d=path_string,
+                        fill=color_names[coloring[str(i)]],
+                        id=f"{type(shape).__name__}_{id}",
+                    )
+                )
+        dwg.save(pretty=True)
+        print(f"there were {len(squares)} squares and {len(rhomboids)} rhomboids")
 
 
+# sort all the points in the tiles
+def xy_sort_function(tile1, tile2):
+    minx1 = min(point[0] for point in tile1)
+    minx2 = min(point[0] for point in tile2)
+    miny1 = min(point[1] for point in tile1)
+    miny2 = min(point[1] for point in tile2)
+    if minx1 == minx2:
+        return miny2 - miny1
+    return minx1 - minx2
+
+
+def distance(point1, point2):
+    return ((point1[0] - point2[0]) ** 2.0 + (point1[1] - point2[1]) ** 2.0) ** 0.5
+
+
+def get_bounding_box(tiles, size):
+    tiles = sorted(tiles, key=cmp_to_key(xy_sort_function))
+
+    x_values = []
+    y_values = []
+    for tile in tiles:
+        for point in tile:
+            x_values.append(point[0] * size)
+            y_values.append(point[1] * size)
+    y_min = min(y_values)
+    y_max = max(y_values)
+    x_min = min(x_values)
+    x_max = max(x_values)
+    return [x_min, x_max, y_min, y_max]
+
+
+epsilon = 0.05
+
+
+def are_neighbors(points1, points2):
+    sides1 = [(points1[i], points1[i - 1]) for i in range(len(points1))]
+    sides2 = [(points2[i], points2[i - 1]) for i in range(len(points2))]
+    for side1i, side1 in enumerate(sides1):
+        for side2i, side2 in enumerate(sides2):
+            distance11 = (
+                (side1[0][0] - side2[0][0]) ** 2.0 + (side1[0][1] - side2[0][1]) ** 2.0
+            ) ** 0.5
+            distance12 = (
+                (side1[0][0] - side2[1][0]) ** 2.0 + (side1[0][1] - side2[1][1]) ** 2.0
+            ) ** 0.5
+            distance21 = (
+                (side1[1][0] - side2[0][0]) ** 2.0 + (side1[1][1] - side2[0][1]) ** 2.0
+            ) ** 0.5
+            distance22 = (
+                (side1[1][0] - side2[1][0]) ** 2.0 + (side1[1][1] - side2[1][1]) ** 2.0
+            ) ** 0.5
+            if distance11 < epsilon / 3 and distance22 < epsilon / 3:
+                return True
+            elif distance12 < epsilon / 3 and distance21 < epsilon / 3:
+                return True
+
+
+def mean_size(tiles):
+    return mean(
+        [distance(tile[i - 1], tile[i]) for tile in tiles for i in range(len(tile))]
+    )
