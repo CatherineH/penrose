@@ -217,6 +217,7 @@ class Tiling(object):
         self.num_steps = num_steps_N
         self.tiling_name = tiling_name_str
         self.tiles = []
+        self.draw_debug = False
 
     ## N
     # Provides access to the num_steps property of the tiling
@@ -243,12 +244,6 @@ class Tiling(object):
 
         ## get_tiles
 
-    # Computes the polygon tiles (list of list of 2D vectors) of the
-    # tiling after N steps
-    # (intended to be overridden by the sub-classes)
-    ##
-    def get_tiles(self):
-        return []
 
     # Returns the only tile in the tiling after zero steps
     #
@@ -288,12 +283,13 @@ class Tiling(object):
     def gen_svg(self):
         size = 200
         [x_min, x_max, y_min, y_max] = get_bounding_box(self.tiles, size)
+        print([tile.tile_type for tile in self.tiles])
         view_box = [-x_min, y_min, x_min * 2, y_max - y_min]
         squares = [tile for tile in self.tiles if tile.tile_type == SQUARE_TILE]
         rhomboids = [tile for tile in self.tiles if tile.tile_type == RHOMB_TILE]
         triangles = [tile for tile in self.tiles if tile.tile_type == TRIANGLE_TILE]
         dwg = Drawing(
-            filename=f"{self.name()}_{self.num_steps}.svg",
+            filename=f"{self.name}_{self.num_steps}.svg",
             viewBox="{} {} {} {}".format(*view_box),
         )
 
@@ -336,14 +332,17 @@ class Tiling(object):
                 )
         else:
             adjacency_matrix = defaultdict(list)
-            final_shapes = squares + rhomboids
+            final_shapes = [tile for tile in self.tiles if tile.tile_type != TRIANGLE_TILE]
+            for i, tile in enumerate(final_shapes):
+                tile.id = str(i)
+
             for i, shape1 in enumerate(final_shapes):
                 for j, shape2 in enumerate(final_shapes):
                     if i == j:
                         continue
                     if i in adjacency_matrix[j] or j in adjacency_matrix[i]:
                         continue
-                    if are_neighbors(shape1.points, shape2.points):
+                    if are_neighbors(shape1.to_points(), shape2.to_points()):
                         adjacency_matrix[i].append(j)
                         adjacency_matrix[j].append(i)
             num_colors = 4
@@ -362,7 +361,7 @@ class Tiling(object):
             color_names = ["red", "green", "blue", "yellow", "purple", "orange"]
             for i, shape in enumerate(final_shapes):
                 id = shape.id
-                points = shape.points
+                points = shape.to_points()
                 path_string = "M {} {} ".format(
                     points[0][0] * size, points[0][1] * size
                 )
@@ -381,10 +380,11 @@ class Tiling(object):
 
 # sort all the points in the tiles
 def xy_sort_function(tile1, tile2):
-    minx1 = min(point[0] for point in tile1)
-    minx2 = min(point[0] for point in tile2)
-    miny1 = min(point[1] for point in tile1)
-    miny2 = min(point[1] for point in tile2)
+
+    minx1 = min(point[0] for point in tile1.to_points())
+    minx2 = min(point[0] for point in tile2.to_points())
+    miny1 = min(point[1] for point in tile1.to_points())
+    miny2 = min(point[1] for point in tile2.to_points())
     if minx1 == minx2:
         return miny2 - miny1
     return minx1 - minx2
@@ -400,7 +400,7 @@ def get_bounding_box(tiles, size):
     x_values = []
     y_values = []
     for tile in tiles:
-        for point in tile:
+        for point in tile.to_points():
             x_values.append(point[0] * size)
             y_values.append(point[1] * size)
     y_min = min(y_values)

@@ -23,6 +23,7 @@ class MillarsTile:
         self.y = y
         self.z = z
         self.w = w
+        self.id = ""
 
     def to_points(self):
         if self.tile_type != STAR_TILE:
@@ -111,8 +112,10 @@ class MillarsNFoldTiling(Tiling):
         ]
 
 
+
 if __name__ == "__main__":
     generations = 5
-
-    tiles = MillarsNFoldTiling(generations).get_tiles()
-    print(tiles)
+    _tiling = MillarsNFoldTiling(generations)
+    _tiling.tiles = _tiling.get_tiles()
+    print(_tiling.tiles)
+    _tiling.gen_svg()
