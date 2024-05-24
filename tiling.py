@@ -70,7 +70,7 @@ def project(
     beta = atan2(endpoint[1] - startpoint[1], endpoint[0] - startpoint[0])
     new_angle = angle + beta
     x1 = length * cos(new_angle)
-    y1 = length * sin(new_angle)
+    y1 = -length * sin(new_angle)
     return vector([startpoint[0] + x1, startpoint[1] + y1])
 
 
@@ -295,41 +295,11 @@ class Tiling(object):
 
         if self.draw_debug:
             for tile in squares + rhomboids:
-                id = tile.id
-                points = tile.points
-                path_string = "M {} {} ".format(
-                    points[0][0] * size, points[0][1] * size
-                )
-                for point in points[1:] + [points[0]]:
-                    path_string += "L {} {} ".format(point[0] * size, point[1] * size)
-                dwg.add(
-                    Path(
-                        d=path_string,
-                        fill="red",
-                        stroke="black",
-                        stroke_width=0.1,
-                        id=f"{type(tile).__name__}_{id}",
-                    )
-                )
+                plot_shape(dwg, tile, size, "red")
 
             counts = defaultdict(int)
             for tile in triangles:
-                id = tile.id
-                points = tile.points
-                path_string = "M {} {} ".format(
-                    points[0][0] * size, points[0][1] * size
-                )
-                for point in points[1:] + points[:1]:
-                    path_string += "L {} {} ".format(point[0] * size, point[1] * size)
-                dwg.add(
-                    Path(
-                        d=path_string,
-                        fill="none",
-                        stroke="purple",
-                        stroke_width=0.5,
-                        id=f"triangle_{id}",
-                    )
-                )
+                plot_shape(dwg, tile, size, fill_color="purple")
         else:
             adjacency_matrix = defaultdict(list)
             final_shapes = [tile for tile in self.tiles if tile.tile_type != TRIANGLE_TILE]
@@ -360,22 +330,26 @@ class Tiling(object):
                 print("no coloring solutions were found!")
             color_names = ["red", "green", "blue", "yellow", "purple", "orange"]
             for i, shape in enumerate(final_shapes):
-                id = shape.id
-                points = shape.to_points()
-                path_string = "M {} {} ".format(
-                    points[0][0] * size, points[0][1] * size
-                )
-                for point in points[1:] + points[:1]:
-                    path_string += "L {} {} ".format(point[0] * size, point[1] * size)
-                dwg.add(
-                    Path(
-                        d=path_string,
-                        fill=color_names[coloring[str(i)]],
-                        id=f"{type(shape).__name__}_{id}",
-                    )
-                )
+                plot_shape(dwg, shape, size, color_names[coloring[str(i)]])
         dwg.save(pretty=True)
         print(f"there were {len(squares)} squares and {len(rhomboids)} rhomboids")
+
+
+def plot_shape(dwg, shape, size, fill_color):
+    id = shape.id
+    points = shape.to_points()
+    path_string = "M {} {} ".format(
+        points[0][0] * size, points[0][1] * size
+    )
+    for point in points[1:] + points[:1]:
+        path_string += "L {} {} ".format(point[0] * size, point[1] * size)
+    dwg.add(
+        Path(
+            d=path_string,
+            fill=fill_color,
+            id=f"{type(shape).__name__}_{id}",
+        )
+    )
 
 
 # sort all the points in the tiles

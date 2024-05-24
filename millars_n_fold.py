@@ -33,11 +33,12 @@ class MillarsTile:
             side = edist(self.x, center_point) * sqrt(
                 (2.0 - sqrt(2.0)) / (2.0 + sqrt(2.0))
             )
+            print(self.x, center_point)
 
-            midpoint1 = project(self.x, center_point, pi / 8, side)
-            midpoint2 = project(self.y, center_point, pi / 8, side)
-            midpoint3 = project(self.z, center_point, pi / 8, side)
-            midpoint4 = project(self.w, center_point, pi / 8, side)
+            midpoint1 = project(self.x, center_point, pi / 4, side)
+            midpoint2 = project(self.y, center_point, pi / 4, side)
+            midpoint3 = project(self.z, center_point, pi / 4, side)
+            midpoint4 = project(self.w, center_point, pi / 4, side)
 
             return [
                 self.x,
