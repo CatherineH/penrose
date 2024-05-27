@@ -3,10 +3,9 @@ from copy import copy
 from typing import List
 from functools import cmp_to_key
 from numpy import array, mean
-from math import sin, cos, pi, atan2
+from math import sin, cos, atan2, pi
 from collections import defaultdict
 from constraint import Problem
-
 
 from svgwrite import Drawing
 from svgwrite.path import Path
@@ -63,18 +62,41 @@ def add(A: vector, B: vector) -> vector:
     return vector([A[0] + B[0], A[1] + B[1]])
 
 
+def sub(A: vector, B: vector) -> vector:
+    return vector([A[0] - B[0], A[1] - B[1]])
+
+
+import numpy as np
+
+
+def unit_vector(vector):
+    """Returns the unit vector of the vector."""
+    return vector / np.linalg.norm(vector)
+
+
+def angle(A, B, origin):
+    norm_a = sub(A, origin)
+    norm_b = sub(B, origin)
+    v1_u = unit_vector(norm_a)
+    v2_u = unit_vector(norm_b)
+    x_axis = unit_vector(vector([1, 0]))
+    angle1 = np.arccos(np.clip(np.dot(v1_u, x_axis), -1.0, 1.0))
+
+    if norm_a[1] < -1:
+        angle1 *= -1
+    angle2 = np.arccos(np.clip(np.dot(v2_u, x_axis), -1.0, 1.0))
+    return angle2 - angle1
+
+
 def project(
     endpoint: vector, startpoint: vector, angle: float, length: float
 ) -> vector:
     # project a point based on a vector and an angle and length
-    beta = atan2(endpoint[1] - startpoint[1], endpoint[0] - startpoint[0])
+    beta = atan2((endpoint[1] - startpoint[1]), endpoint[0] - startpoint[0])
     new_angle = angle + beta
     x1 = length * cos(new_angle)
-    y1 = -length * sin(new_angle)
+    y1 = length * sin(new_angle)
     return vector([startpoint[0] + x1, startpoint[1] + y1])
-
-
-##
 
 
 def get_solutionsXY(solns):
@@ -244,7 +266,6 @@ class Tiling(object):
 
         ## get_tiles
 
-
     # Returns the only tile in the tiling after zero steps
     #
     def get_initial_tile(self):
@@ -302,7 +323,9 @@ class Tiling(object):
                 plot_shape(dwg, tile, size, fill_color="purple")
         else:
             adjacency_matrix = defaultdict(list)
-            final_shapes = [tile for tile in self.tiles if tile.tile_type != TRIANGLE_TILE]
+            final_shapes = [
+                tile for tile in self.tiles if tile.tile_type != TRIANGLE_TILE
+            ]
             for i, tile in enumerate(final_shapes):
                 tile.id = str(i)
 
@@ -338,9 +361,7 @@ class Tiling(object):
 def plot_shape(dwg, shape, size, fill_color):
     id = shape.id
     points = shape.to_points()
-    path_string = "M {} {} ".format(
-        points[0][0] * size, points[0][1] * size
-    )
+    path_string = "M {} {} ".format(points[0][0] * size, points[0][1] * size)
     for point in points[1:] + points[:1]:
         path_string += "L {} {} ".format(point[0] * size, point[1] * size)
     dwg.add(
@@ -354,7 +375,6 @@ def plot_shape(dwg, shape, size, fill_color):
 
 # sort all the points in the tiles
 def xy_sort_function(tile1, tile2):
-
     minx1 = min(point[0] for point in tile1.to_points())
     minx2 = min(point[0] for point in tile2.to_points())
     miny1 = min(point[1] for point in tile1.to_points())
