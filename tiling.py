@@ -302,7 +302,7 @@ class Tiling(object):
         for n in range(1, self.N):
             next_tiles_list = self.get_next_tiling(tile_list)
             tile_list = next_tiles_list
-
+        # TODO: figure out how to combine the triangle tiles
         rtiles_list = []
         for idx, atile in enumerate(tile_list):
             rtiles_list.append(atile)
@@ -310,6 +310,8 @@ class Tiling(object):
         return rtiles_list
 
     def gen_svg(self):
+        if not self.tiles:
+            return
         size = 200
         [x_min, x_max, y_min, y_max] = get_bounding_box(self.tiles, size)
         print([tile.tile_type for tile in self.tiles])
@@ -332,7 +334,7 @@ class Tiling(object):
         else:
             adjacency_matrix = defaultdict(list)
             final_shapes = [
-                tile for tile in self.tiles if tile.tile_type != TRIANGLE_TILE
+                tile for tile in self.tiles  # if tile.tile_type != TRIANGLE_TILE
             ]
             for i, tile in enumerate(final_shapes):
                 tile.id = str(i)
@@ -405,6 +407,7 @@ def get_bounding_box(tiles, size):
         for point in tile.to_points():
             x_values.append(point[0] * size)
             y_values.append(point[1] * size)
+
     y_min = min(y_values)
     y_max = max(y_values)
     x_min = min(x_values)

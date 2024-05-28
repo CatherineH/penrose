@@ -60,10 +60,15 @@ def test_star_midpoints(coords, expected_midpoints):
             ), f"point didn't match: {i} {j}"
 
 
-def test_subtiles_star():
-    shape = MillarsTile(
-        STAR_TILE, vector([-1, 0]), vector([0, 1]), vector([1, 0]), vector([0, -1])
-    )
+@pytest.mark.parametrize(
+    "coords",
+    [
+        (vector([-1, 0]), vector([0, 1]), vector([1, 0]), vector([0, -1])),
+        (vector([0, 0]), vector([1, 1]), vector([0, 2]), vector([-1, 1])),
+    ],
+)
+def test_subtiles_star(coords):
+    shape = MillarsTile(STAR_TILE, coords[0], coords[1], coords[2], coords[3])
     print(shape.to_points())
 
     tiles = shape.to_subtiles_star()
