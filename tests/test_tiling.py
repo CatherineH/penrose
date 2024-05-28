@@ -51,7 +51,7 @@ def test_square_angles_negative(vector1, vector2):
         (vector([0, 1]), vector([-1, 0])),
         (vector([-1, 0]), vector([0, -1])),
         (vector([0, -1]), vector([1, 0])),
-        (vector([0, 1]), vector([1, 0])),
+        (vector([1, 0]), vector([0, 1])),
     ],
 )
 def test_square_angles(vector1, vector2):

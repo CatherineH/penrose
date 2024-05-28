@@ -33,9 +33,9 @@ RATIO = 0.29289321881345254  # 0.611*sin(pi/4)#sqrt((2-sqrt(2))/(2+sqrt(2)))#*si
             ],
             [
                 vector([-RATIO, -RATIO]),
-                vector([-RATIO, RATIO]),
-                vector([RATIO, RATIO]),
                 vector([RATIO, -RATIO]),
+                vector([RATIO, RATIO]),
+                vector([-RATIO, RATIO]),
             ],
         ),
     ],
@@ -55,8 +55,8 @@ def test_star_midpoints(coords, expected_midpoints):
     dwg.save(pretty=True)
     for i, value in enumerate(actual_midpoints):
         for j, point in enumerate(value):
-            assert (
-                pytest.approx(expected_midpoints[i][j]) == point
+            assert point == pytest.approx(
+                expected_midpoints[i][j]
             ), f"point didn't match: {i} {j}"
 
 

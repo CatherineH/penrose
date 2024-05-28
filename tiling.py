@@ -82,10 +82,18 @@ def angle(A, B, origin):
     x_axis = unit_vector(vector([1, 0]))
     angle1 = np.arccos(np.clip(np.dot(v1_u, x_axis), -1.0, 1.0))
 
-    if norm_a[1] < -1:
+    if norm_a[1] < 0:
         angle1 *= -1
     angle2 = np.arccos(np.clip(np.dot(v2_u, x_axis), -1.0, 1.0))
-    return angle2 - angle1
+    if norm_b[1] < 0:
+        angle2 *= -1
+    diff_angle = angle2 - angle1
+
+    if diff_angle < -pi:
+        diff_angle += 2 * pi
+    if diff_angle > pi:
+        diff_angle -= 2 * pi
+    return diff_angle
 
 
 def project(
