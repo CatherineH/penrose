@@ -157,7 +157,33 @@ class MillarsTile:
             SQUARE_TILE, center_point, points[1], projected_corner4, points[7]
         )
         square4.convex_check()
-        return [square1, square2, square3, square4]
+        return [square1, square2, square3, square4,
+                MillarsTile(TRIANGLE_TILE, self.x, points[1], projected_corner4),
+                MillarsTile(TRIANGLE_TILE, self.x, points[7], projected_corner4),
+                MillarsTile(TRIANGLE_TILE, self.y, points[1], projected_corner1),
+                MillarsTile(TRIANGLE_TILE, self.y, points[3], projected_corner1),
+                MillarsTile(TRIANGLE_TILE, self.z, points[3], projected_corner2),
+                MillarsTile(TRIANGLE_TILE, self.z, points[5], projected_corner2),
+                MillarsTile(TRIANGLE_TILE, self.w, points[5], projected_corner3),
+                MillarsTile(TRIANGLE_TILE, self.w, points[7], projected_corner3),
+
+                ]
+
+    def to_subtiles_triangle(self):
+        # three triangles, at thirds along the long side
+        # the corner that is not being used is common to all three triangles
+        dist_12 = edist(self.x, self.y)
+        dist_13 = edist(self.x, self.z)
+        dist_23 = edist(self.y, self.z)
+        common_point = None
+        if dist_23 > dist_12 and dist_23 > dist_13:
+            common_point = self.x
+        if dist_12 > dist_13 and dist_12 > dist_23:
+            common_point = self.z
+        if dist_13 > dist_12 and dist_13 > dist_23:
+            common_point = self.y
+        
+        return []
 
     def to_subtiles(self):
         if self.tile_type == SQUARE_TILE:
