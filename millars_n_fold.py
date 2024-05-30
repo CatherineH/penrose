@@ -9,7 +9,11 @@ from tiling import (
     RHOMB_TILE,
     TRIANGLE_TILE,
     angle,
+    epsilon,
 )
+
+from functools import cmp_to_key
+from statistics import mean
 from math import sin, cos, sqrt, pi
 import pytest
 
@@ -26,6 +30,7 @@ class MillarsTile:
         self.z = z
         self.w = w
         self.id = ""
+        self.other_triangle_id = None
 
     def convex_check(self):
         center_point = midpoint(self.x, self.z)
@@ -73,6 +78,21 @@ class MillarsTile:
                 self.w,
                 midpoint4,
             ]
+
+    def average_edge_length(self):
+        if self.w:
+            return mean(
+                [
+                    edist(self.x, self.y),
+                    edist(self.y, self.z),
+                    edist(self.z, self.w),
+                    edist(self.w, self.x),
+                ]
+            )
+        else:
+            return mean(
+                [edist(self.x, self.y), edist(self.y, self.z), edist(self.z, self.x)]
+            )
 
     def midpoint(self, p1, inverse=False):
         center_point = midpoint(self.x, self.z)
@@ -157,17 +177,20 @@ class MillarsTile:
             SQUARE_TILE, center_point, points[1], projected_corner4, points[7]
         )
         square4.convex_check()
-        return [square1, square2, square3, square4,
-                MillarsTile(TRIANGLE_TILE, self.x, points[1], projected_corner4),
-                MillarsTile(TRIANGLE_TILE, self.x, points[7], projected_corner4),
-                MillarsTile(TRIANGLE_TILE, self.y, points[1], projected_corner1),
-                MillarsTile(TRIANGLE_TILE, self.y, points[3], projected_corner1),
-                MillarsTile(TRIANGLE_TILE, self.z, points[3], projected_corner2),
-                MillarsTile(TRIANGLE_TILE, self.z, points[5], projected_corner2),
-                MillarsTile(TRIANGLE_TILE, self.w, points[5], projected_corner3),
-                MillarsTile(TRIANGLE_TILE, self.w, points[7], projected_corner3),
-
-                ]
+        return [
+            square1,
+            square2,
+            square3,
+            square4,
+            MillarsTile(TRIANGLE_TILE, self.x, points[1], projected_corner4),
+            MillarsTile(TRIANGLE_TILE, self.x, points[7], projected_corner4),
+            MillarsTile(TRIANGLE_TILE, self.y, points[1], projected_corner1),
+            MillarsTile(TRIANGLE_TILE, self.y, points[3], projected_corner1),
+            MillarsTile(TRIANGLE_TILE, self.z, points[3], projected_corner2),
+            MillarsTile(TRIANGLE_TILE, self.z, points[5], projected_corner2),
+            MillarsTile(TRIANGLE_TILE, self.w, points[5], projected_corner3),
+            MillarsTile(TRIANGLE_TILE, self.w, points[7], projected_corner3),
+        ]
 
     def to_subtiles_triangle(self):
         # three triangles, at thirds along the long side
@@ -182,7 +205,7 @@ class MillarsTile:
             common_point = self.z
         if dist_13 > dist_12 and dist_13 > dist_23:
             common_point = self.y
-        
+
         return []
 
     def to_subtiles(self):
@@ -211,6 +234,90 @@ class MillarsNFoldTiling(Tiling):
                 vector([0, -100]),
             )
         ]
+
+    def get_next_tiling(self, prev_tiles):
+        next_tiles = []
+        for tile in prev_tiles:
+            subtiles = tile.to_subtiles()
+            next_tiles.extend(subtiles)
+        # merge the triangles into rhomboids
+        non_triangles = [tile for tile in next_tiles if tile.tile_type != TRIANGLE_TILE]
+        triangles = [tile for tile in next_tiles if tile.tile_type == TRIANGLE_TILE]
+        remaining_triangles, rhomboids = merge_triangles(triangles)
+
+        next_tiles = non_triangles + rhomboids + remaining_triangles
+        return next_tiles
+
+
+def merge_triangles(triangles):
+    rhomboids = []
+    # merge the triangles
+    for triangle in triangles:
+        if triangle.other_triangle_id:
+            continue  # we already know this one
+        for other_triangle in triangles:
+            if other_triangle.id == triangle.id:
+                continue
+            if other_triangle.other_triangle_id:
+                continue
+            comparison_points = triangle.to_points() + other_triangle.to_points()
+            average_size_length = 0.5 * (
+                triangle.average_edge_length() + other_triangle.average_edge_length()
+            )
+            debug = False
+            only_unique = triangles_to_square(
+                comparison_points, expected_size=average_size_length, debug=debug
+            )
+            if only_unique:
+                rhomboids.append(
+                    MillarsTile(
+                        RHOMB_TILE,
+                        only_unique[0],
+                        only_unique[1],
+                        only_unique[2],
+                        only_unique[3],
+                    )
+                )
+                triangle.other_triangle_id = other_triangle.id
+                other_triangle.other_triangle_id = triangle.id
+
+    remaining_triangles = [triangle for tile in triangles if not tile.other_triangle_id]
+    return remaining_triangles, rhomboids
+
+
+def triangles_to_square(comparison_points, expected_size=1.0, debug=False):
+    comparison_points = sorted(
+        comparison_points,
+        key=cmp_to_key(
+            lambda x, y: x[0] - y[0]
+            if abs(x[0] - y[0]) > epsilon * expected_size
+            else -x[1] + y[1]
+        ),
+    )
+    # reduce the points that over top of each other
+    only_unique = [comparison_points[0]]
+    if debug:
+        print(f"expected_size {expected_size}")
+        print(f"after sorting: {comparison_points}")
+    for i in range(1, len(comparison_points)):
+        point = comparison_points[i - 1]
+        other_point = comparison_points[i]
+        _dist = (
+            (point[0] - other_point[0]) ** 2.0 + (point[1] - other_point[1]) ** 2.0
+        ) ** 0.5
+        if _dist < epsilon * expected_size:
+            continue
+        else:
+            if debug:
+                print(f"distance: {_dist}")
+
+        only_unique.append(other_point)
+    if len(only_unique) == 4:
+        return only_unique
+    else:
+        if debug:
+            print(f"only_unique points: {len(only_unique)}")
+        return None
 
 
 if __name__ == "__main__":

@@ -359,9 +359,13 @@ class Tiling(object):
                 for neighbor in adjacency_matrix[i]:
                     problem.addConstraint(lambda a, b: a != b, (str(neighbor), str(i)))
             coloring = problem.getSolution()
+            color_names = ["red", "green", "blue", "yellow", "purple", "orange"]
+
             if not coloring:
                 print("no coloring solutions were found!")
-            color_names = ["red", "green", "blue", "yellow", "purple", "orange"]
+                coloring = {}
+                for i in range(len(final_shapes)):
+                    coloring[str(i)] = i % len(color_names)
             for i, shape in enumerate(final_shapes):
                 plot_shape(dwg, shape, size, color_names[coloring[str(i)]])
         dwg.save(pretty=True)

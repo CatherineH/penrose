@@ -483,46 +483,6 @@ class Rhombus:
         self.points = points
 
 
-def triangles_to_square(comparison_points, expected_size=1.0, debug=False):
-    comparison_points = sorted(
-        comparison_points,
-        key=cmp_to_key(
-            lambda x, y: x[0] - y[0]
-            if abs(x[0] - y[0]) > epsilon * expected_size
-            else -x[1] + y[1]
-        ),
-    )
-    # reduce the points that over top of each other
-    only_unique = [comparison_points[0]]
-    if debug:
-        print(f"expected_size {expected_size}")
-        print(f"after sorting: {comparison_points}")
-    for i in range(1, len(comparison_points)):
-        point = comparison_points[i - 1]
-        other_point = comparison_points[i]
-        _dist = (
-            (point[0] - other_point[0]) ** 2.0 + (point[1] - other_point[1]) ** 2.0
-        ) ** 0.5
-        if _dist < epsilon * expected_size:
-            continue
-        else:
-            if debug:
-                print(f"distance: {_dist}")
-
-        only_unique.append(other_point)
-    if len(only_unique) == 4:
-        only_unique = only_unique[:2] + [only_unique[3], only_unique[2]]
-
-    else:
-        if debug:
-            print(f"only_unique points: {len(only_unique)}")
-        return None
-    if is_square(only_unique, debug):
-        return only_unique
-    if debug:
-        print(f"{only_unique} was not square!")
-
-
 def is_square(coordinates, debug=False):
     if debug:
         print(f"is_square: {coordinates}")
@@ -574,41 +534,6 @@ if __name__ == "__main__":
     ]
     squares = []
     debug_target = [52, 53]
-    edge_triangles = []
-    # merge the triangles
-    for triangle in triangles:
-        if triangle.other_triangle_id:
-            continue  # we already know this one
-        for other_triangle in triangles:
-            if other_triangle.id == triangle.id:
-                continue
-            if other_triangle.other_triangle_id:
-                continue
-            same_points = []
-            corner_points = []
-            comparison_points = triangle.points + other_triangle.points
-            debug = False
-            if triangle.id in debug_target and other_triangle.id in debug_target:
-                print(triangle.id, other_triangle.id, comparison_points)
-                debug = True
-            only_unique = triangles_to_square(
-                comparison_points, expected_size=average_size_length, debug=debug
-            )
-
-            if triangle.id in debug_target and other_triangle.id in debug_target:
-                if not only_unique:
-                    sys.exit()
-
-            if only_unique:
-                print(f"matched {triangle.id} to {other_triangle.id}")
-
-                squares.append(
-                    Square(id=f"{triangle.id}_{other_triangle.id}", points=only_unique)
-                )
-                triangle.other_triangle_id = other_triangle.id
-                other_triangle.other_triangle_id = triangle.id
-                break
-        edge_triangles.append(triangle)
 
     rhomboids = [tile for tile in tiles if len(tile) == 4]
     view_box = [-x_min, y_min, x_min * 2, y_max - y_min]
@@ -696,3 +621,81 @@ if __name__ == "__main__":
             )
     dwg.save(pretty=True)
     print(f"there were {len(squares)} squares and {len(rhomboids)} rhomboids")
+
+
+def triangles_to_square(comparison_points, expected_size=1.0, debug=False):
+    comparison_points = sorted(
+        comparison_points,
+        key=cmp_to_key(
+            lambda x, y: x[0] - y[0]
+            if abs(x[0] - y[0]) > epsilon * expected_size
+            else -x[1] + y[1]
+        ),
+    )
+    # reduce the points that over top of each other
+    only_unique = [comparison_points[0]]
+    if debug:
+        print(f"expected_size {expected_size}")
+        print(f"after sorting: {comparison_points}")
+    for i in range(1, len(comparison_points)):
+        point = comparison_points[i - 1]
+        other_point = comparison_points[i]
+        _dist = (
+            (point[0] - other_point[0]) ** 2.0 + (point[1] - other_point[1]) ** 2.0
+        ) ** 0.5
+        if _dist < epsilon * expected_size:
+            continue
+        else:
+            if debug:
+                print(f"distance: {_dist}")
+
+        only_unique.append(other_point)
+    if len(only_unique) == 4:
+        only_unique = only_unique[:2] + [only_unique[3], only_unique[2]]
+
+    else:
+        if debug:
+            print(f"only_unique points: {len(only_unique)}")
+        return None
+    if is_square(only_unique, debug):
+        return only_unique
+    if debug:
+        print(f"{only_unique} was not square!")
+
+
+def merge_triangles(triangles):
+    squares = []
+    # merge the triangles
+    for triangle in triangles:
+        if triangle.other_triangle_id:
+            continue  # we already know this one
+        for other_triangle in triangles:
+            if other_triangle.id == triangle.id:
+                continue
+            if other_triangle.other_triangle_id:
+                continue
+            same_points = []
+            corner_points = []
+            comparison_points = triangle.points + other_triangle.points
+            debug = False
+            if triangle.id in debug_target and other_triangle.id in debug_target:
+                print(triangle.id, other_triangle.id, comparison_points)
+                debug = True
+            only_unique = triangles_to_square(
+                comparison_points, expected_size=average_size_length, debug=debug
+            )
+
+            if triangle.id in debug_target and other_triangle.id in debug_target:
+                if not only_unique:
+                    sys.exit()
+
+            if only_unique:
+                print(f"matched {triangle.id} to {other_triangle.id}")
+
+                squares.append(
+                    Square(id=f"{triangle.id}_{other_triangle.id}", points=only_unique)
+                )
+                triangle.other_triangle_id = other_triangle.id
+                other_triangle.other_triangle_id = triangle.id
+                break
+    return squares
