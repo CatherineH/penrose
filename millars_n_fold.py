@@ -80,7 +80,11 @@ class MillarsTile:
             ]
 
     def average_edge_length(self):
-        if self.w:
+        if self.w is None:
+            return mean(
+                [edist(self.x, self.y), edist(self.y, self.z), edist(self.z, self.x)]
+            )
+        else:
             return mean(
                 [
                     edist(self.x, self.y),
@@ -88,10 +92,6 @@ class MillarsTile:
                     edist(self.z, self.w),
                     edist(self.w, self.x),
                 ]
-            )
-        else:
-            return mean(
-                [edist(self.x, self.y), edist(self.y, self.z), edist(self.z, self.x)]
             )
 
     def midpoint(self, p1, inverse=False):
@@ -243,6 +243,8 @@ class MillarsNFoldTiling(Tiling):
         # merge the triangles into rhomboids
         non_triangles = [tile for tile in next_tiles if tile.tile_type != TRIANGLE_TILE]
         triangles = [tile for tile in next_tiles if tile.tile_type == TRIANGLE_TILE]
+        for i, triangle in enumerate(triangles):
+            triangle.id = i
         remaining_triangles, rhomboids = merge_triangles(triangles)
 
         next_tiles = non_triangles + rhomboids + remaining_triangles
@@ -254,6 +256,7 @@ def merge_triangles(triangles):
     # merge the triangles
     for triangle in triangles:
         if triangle.other_triangle_id:
+            print(f"we already know {triangle.other_triangle_id=}")
             continue  # we already know this one
         for other_triangle in triangles:
             if other_triangle.id == triangle.id:
@@ -268,6 +271,8 @@ def merge_triangles(triangles):
             only_unique = triangles_to_square(
                 comparison_points, expected_size=average_size_length, debug=debug
             )
+            # TODO: we need to determine whether the values are concave, that means they should all be going in the same direction?
+            # print(f"only_unique {only_unique}")
             if only_unique:
                 rhomboids.append(
                     MillarsTile(

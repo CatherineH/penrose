@@ -1,5 +1,13 @@
-from millars_n_fold import MillarsTile
-from tiling import STAR_TILE, vector, plot_shape, get_bounding_box, edist
+from millars_n_fold import MillarsTile, merge_triangles
+from tiling import (
+    STAR_TILE,
+    vector,
+    plot_shape,
+    get_bounding_box,
+    edist,
+    TRIANGLE_TILE,
+    RHOMB_TILE,
+)
 import pytest
 from math import sqrt, sin, pi
 from svgwrite import Drawing
@@ -83,3 +91,17 @@ def test_subtiles_star(coords):
                     pytest.approx(prev_edist) == new_edist
                 ), f"not a square! {tile.to_points()}"
             prev_edist = new_edist
+
+
+def test_merge_triangles():
+    triangle1 = MillarsTile(
+        TRIANGLE_TILE, vector([-2, 0]), vector([0, 1]), vector([2, 0])
+    )
+    triangle1.id = 1
+    triangle2 = MillarsTile(
+        TRIANGLE_TILE, vector([-2, 0]), vector([0, -1]), vector([2, 0])
+    )
+    triangle2.id = 2
+    remaining_triangles, rhombs = merge_triangles([triangle1, triangle2])
+    assert remaining_triangles == []
+    assert rhombs[0].tile_type == RHOMB_TILE
