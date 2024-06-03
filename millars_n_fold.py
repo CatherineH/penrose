@@ -20,6 +20,9 @@ import pytest
 
 sc = float(cos(pi / 4))
 sin_alpha = float(sin(pi / 4))
+RATIO_SIDE = sqrt(
+                (2.0 - sqrt(2.0)) / (2.0 + sqrt(2.0))
+            )
 
 
 class MillarsTile:
@@ -32,7 +35,7 @@ class MillarsTile:
         self.id = ""
         self.other_triangle_id = None
 
-    def convex_check(self):
+    def square_check(self):
         center_point = midpoint(self.x, self.z)
         angle_between = angle(self.x, self.y, center_point) / 2.0
         angle_between2 = angle(self.y, self.z, center_point) / 2.0
@@ -47,6 +50,32 @@ class MillarsTile:
         ), f"angles not equal! {angle_between} {angle_between2} {angle_between3} {angle_between4} {self.x} {self.y} {self.z} {self.w}"
         return angle_between
 
+    def rhombus_check(self):
+        center_point = midpoint(self.x, self.z)
+        angles = [0] * 4
+        angles[0] = angle(self.x, self.y, center_point) / 2.0
+        angles[1] = angle(self.y, self.z, center_point) / 2.0
+        angles[2] = angle(self.z, self.w, center_point) / 2.0
+        angles[3] = angle(self.w, self.x, center_point) / 2.0
+        print(f"rhombus check: {angles=}")
+
+        def sign(x):
+            return x > 0
+
+        angle_signs = set(sign(_angle) for _angle in angles)
+        print(f"rhombus check: {angles=} {angle_signs=}")
+        print(
+            f"rhombus check 2: {angle(self.y, self.x, self.w)} == {angle(self.w, self.z, self.y)}, {angle(self.x, self.y, self.z)} == {angle(self.z, self.w, self.x)}"
+        )
+        rhombus_rules = True
+        rhombus_rules = rhombus_rules and pytest.approx(
+            angle(self.y, self.x, self.w)
+        ) == pytest.approx(angle(self.w, self.z, self.y))
+        rhombus_rules = rhombus_rules and pytest.approx(
+            angle(self.x, self.y, self.z)
+        ) == pytest.approx(angle(self.z, self.w, self.x))
+        return len(angle_signs) == 1 and rhombus_rules
+
     def to_points(self):
         if self.tile_type == TRIANGLE_TILE:
             return [self.x, self.y, self.z]
@@ -54,12 +83,10 @@ class MillarsTile:
             return [self.x, self.y, self.z, self.w]
         else:
             center_point = midpoint(self.x, self.z)
-            side = edist(self.x, center_point) * sqrt(
-                (2.0 - sqrt(2.0)) / (2.0 + sqrt(2.0))
-            )
+            side = edist(self.x, center_point) * RATIO_SIDE
             # we need to find the sign of the square - i.e. is it clockwise or counterclockwise?
             # if it is clockwise the projection angle must be negative, else positive
-            angle_between = self.convex_check()
+            angle_between = self.square_check()
             midpoint1 = project(self.x, center_point, angle_between, side)
 
             # print("angle between:", angle_between, self.x, side, center_point)
@@ -96,8 +123,8 @@ class MillarsTile:
 
     def midpoint(self, p1, inverse=False):
         center_point = midpoint(self.x, self.z)
-        side = edist(self.x, center_point) * sqrt((2.0 - sqrt(2.0)) / (2.0 + sqrt(2.0)))
-        angle_between = self.convex_check()
+        side = edist(self.x, center_point) * RATIO_SIDE
+        angle_between = self.square_check()
         if inverse:
             angle_between *= -1
         return project(p1, center_point, angle_between, side)
@@ -164,19 +191,19 @@ class MillarsTile:
         square1 = MillarsTile(
             SQUARE_TILE, center_point, points[3], projected_corner1, points[1]
         )
-        square1.convex_check()
+        square1.square_check()
         square2 = MillarsTile(
             SQUARE_TILE, center_point, points[5], projected_corner2, points[3]
         )
-        square2.convex_check()
+        square2.square_check()
         square3 = MillarsTile(
             SQUARE_TILE, center_point, points[7], projected_corner3, points[5]
         )
-        square3.convex_check()
+        square3.square_check()
         square4 = MillarsTile(
             SQUARE_TILE, center_point, points[1], projected_corner4, points[7]
         )
-        square4.convex_check()
+        square4.square_check()
         return [
             square1,
             square2,
@@ -199,14 +226,31 @@ class MillarsTile:
         dist_13 = edist(self.x, self.z)
         dist_23 = edist(self.y, self.z)
         common_point = None
+        start_point = None
+        end_point = None
+        _length = None
         if dist_23 > dist_12 and dist_23 > dist_13:
             common_point = self.x
-        if dist_12 > dist_13 and dist_12 > dist_23:
+            start_point = self.y
+            end_point = self.z
+            _length = dist_23
+        elif dist_12 > dist_13 and dist_12 > dist_23:
             common_point = self.z
-        if dist_13 > dist_12 and dist_13 > dist_23:
+            start_point = self.x
+            end_point = self.y
+            _length = dist_12
+        else:
             common_point = self.y
-
-        return []
+            start_point = self.x
+            end_point = self.z
+            _length = dist_13
+        a = project(end_point, start_point, 0, _length * RATIO_SIDE*RATIO_SIDE)
+        b = project(end_point, start_point, 0, _length * (1.0-RATIO_SIDE*RATIO_SIDE))
+        return [
+            MillarsTile(TRIANGLE_TILE, start_point, common_point, a),
+            MillarsTile(TRIANGLE_TILE, a, common_point, b),
+            MillarsTile(TRIANGLE_TILE, b, common_point, end_point),
+        ]
 
     def to_subtiles(self):
         if self.tile_type == SQUARE_TILE:
@@ -216,7 +260,7 @@ class MillarsTile:
         elif self.tile_type == STAR_TILE:
             return self.to_subtiles_star()
         elif self.tile_type == TRIANGLE_TILE:
-            return [self]
+            return self.to_subtiles_triangle()
 
 
 class MillarsNFoldTiling(Tiling):
@@ -254,11 +298,20 @@ class MillarsNFoldTiling(Tiling):
 def merge_triangles(triangles):
     rhomboids = []
     # merge the triangles
+    print(f"start {triangles=}")
+    auto_increment = 0
     for triangle in triangles:
+        if not triangle.id:
+            triangle.id = f"generated_id{auto_increment}"
+            auto_increment += 1
+
         if triangle.other_triangle_id:
             print(f"we already know {triangle.other_triangle_id=}")
             continue  # we already know this one
         for other_triangle in triangles:
+            if not other_triangle.id:
+                other_triangle.id = f"generated_id{auto_increment}"
+                auto_increment += 1
             if other_triangle.id == triangle.id:
                 continue
             if other_triangle.other_triangle_id:
@@ -274,19 +327,57 @@ def merge_triangles(triangles):
             # TODO: we need to determine whether the values are concave, that means they should all be going in the same direction?
             # print(f"only_unique {only_unique}")
             if only_unique:
-                rhomboids.append(
-                    MillarsTile(
-                        RHOMB_TILE,
-                        only_unique[0],
-                        only_unique[1],
-                        only_unique[2],
-                        only_unique[3],
-                    )
+                x_cand = None
+                for only_u in only_unique:
+                    if x_cand is None:
+                        x_cand = only_u
+                    if x_cand[0] > only_u[0]:
+                        x_cand = only_u
+                only_unique = [
+                    entry
+                    for entry in only_unique
+                    if x_cand[0] != entry[0] or x_cand[1] != entry[1]
+                ]
+                assert len(only_unique) == 3, f"{only_unique} {x_cand}"
+                z_cand = None
+                for only_u in only_unique:
+                    if z_cand is None:
+                        z_cand = only_u
+                    if z_cand[0] < only_u[0]:
+                        z_cand = only_u
+                only_unique = [
+                    entry
+                    for entry in only_unique
+                    if z_cand[0] != entry[0] or z_cand[1] != entry[1]
+                ]
+                y_cand = None
+                for only_u in only_unique:
+                    if y_cand is None:
+                        y_cand = only_u
+                    if y_cand[1] > only_u[1]:
+                        y_cand = only_u
+                only_unique = [
+                    entry
+                    for entry in only_unique
+                    if y_cand[0] != entry[0] or y_cand[1] != entry[1]
+                ]
+                w_cand = only_unique[0]
+                rhomboid = MillarsTile(
+                    RHOMB_TILE,
+                    x_cand,
+                    y_cand,
+                    z_cand,
+                    w_cand,
                 )
-                triangle.other_triangle_id = other_triangle.id
-                other_triangle.other_triangle_id = triangle.id
-
-    remaining_triangles = [triangle for tile in triangles if not tile.other_triangle_id]
+                if rhomboid.rhombus_check():
+                    rhomboids.append(rhomboid)
+                    triangle.other_triangle_id = other_triangle.id
+                    other_triangle.other_triangle_id = triangle.id
+                else:
+                    print(
+                        f"points: {rhomboid.to_points()} were determined to not be a rhombus {triangles=}"
+                    )
+    remaining_triangles = [tile for tile in triangles if not tile.other_triangle_id]
     return remaining_triangles, rhomboids
 
 

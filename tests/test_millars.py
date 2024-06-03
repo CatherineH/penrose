@@ -93,15 +93,62 @@ def test_subtiles_star(coords):
             prev_edist = new_edist
 
 
-def test_merge_triangles():
-    triangle1 = MillarsTile(
-        TRIANGLE_TILE, vector([-2, 0]), vector([0, 1]), vector([2, 0])
-    )
-    triangle1.id = 1
-    triangle2 = MillarsTile(
-        TRIANGLE_TILE, vector([-2, 0]), vector([0, -1]), vector([2, 0])
-    )
-    triangle2.id = 2
+def test_subtiles_triangle():
+    shape = MillarsTile(TRIANGLE_TILE, vector([0, 3]), vector([0, 0]), vector([1, 1.5]))
+    triangles = shape.to_subtiles_triangle()
+
+    assert pytest.approx(triangles[0].z[1]) == 2
+    assert pytest.approx(triangles[1].z[1]) == 1
+
+
+@pytest.mark.parametrize(
+    "triangle1, triangle2",
+    [
+        (
+            MillarsTile(
+                TRIANGLE_TILE, vector([-2, 1]), vector([0, 1]), vector([2, -1])
+            ),
+            MillarsTile(
+                TRIANGLE_TILE, vector([-2, 1]), vector([0, -1]), vector([2, -1])
+            ),
+        ),
+    ],
+)
+def test_merge_triangles(triangle1, triangle2):
+
     remaining_triangles, rhombs = merge_triangles([triangle1, triangle2])
     assert remaining_triangles == []
     assert rhombs[0].tile_type == RHOMB_TILE
+
+
+def test_merge_triangles_no_merge():
+    triangle1 = MillarsTile(
+        TRIANGLE_TILE, vector([-2, 1]), vector([0, 1]), vector([0, 0])
+    )
+    triangle1.id = 1
+    triangle2 = MillarsTile(
+        TRIANGLE_TILE, vector([2, 1]), vector([0, 1]), vector([0, 0])
+    )
+    triangle2.id = 2
+    remaining_triangles, rhombs = merge_triangles([triangle1, triangle2])
+    assert remaining_triangles == [triangle1, triangle2]
+    assert rhombs == []
+
+
+def test_rhombus_check():
+    rhombus = MillarsTile(
+        RHOMB_TILE,
+        x=vector([-1, 1]),
+        y=vector([0, 0]),
+        z=vector([1, 0]),
+        w=vector([-1, -1]),
+    )
+    assert not rhombus.rhombus_check()
+    rhombus = MillarsTile(
+        RHOMB_TILE,
+        x=vector([-1, 1]),
+        y=vector([0, 1]),
+        z=vector([1, 0]),
+        w=vector([0, 0]),
+    )
+    assert rhombus.rhombus_check()
