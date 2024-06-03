@@ -97,9 +97,18 @@ def test_subtiles_triangle():
     shape = MillarsTile(TRIANGLE_TILE, vector([0, 3]), vector([0, 0]), vector([1, 1.5]))
     triangles = shape.to_subtiles_triangle()
 
-    assert pytest.approx(triangles[0].z[1]) == 2
-    assert pytest.approx(triangles[1].z[1]) == 1
+    assert pytest.approx(triangles[0].z[1]) == 2.024344
+    assert pytest.approx(triangles[1].z[1]) == 0.975655
 
+
+def test_subtiles_rhombus():
+    w = vector([4142.135623730951, 10000.0])
+    rhombus = MillarsTile(RHOMB_TILE, x=vector([1715.7287525380993, 9999.999999999998]), 
+    y=vector([1715.7287525380998,7573.593128807149]), 
+    z=vector([4142.135623730949, 7573.593128807149]), 
+    w=w)
+    subtiles = rhombus.to_subtiles_rhomb()
+    assert subtiles[0].square_check()
 
 @pytest.mark.parametrize(
     "triangle1, triangle2",

@@ -24,6 +24,8 @@ RATIO_SIDE = sqrt(
                 (2.0 - sqrt(2.0)) / (2.0 + sqrt(2.0))
             )
 
+TRIANGLE_RATIO_SIDE = sqrt(2.0)*sqrt(2.0-sqrt(2.0))/2.0
+
 
 class MillarsTile:
     def __init__(self, tile_type, x: vector, y: vector, z: vector, w: vector = None):
@@ -233,22 +235,25 @@ class MillarsTile:
             common_point = self.x
             start_point = self.y
             end_point = self.z
-            _length = dist_23
+            _length = dist_12
         elif dist_12 > dist_13 and dist_12 > dist_23:
             common_point = self.z
             start_point = self.x
             end_point = self.y
-            _length = dist_12
+            _length = dist_13
         else:
             common_point = self.y
             start_point = self.x
             end_point = self.z
-            _length = dist_13
-        a = project(end_point, start_point, 0, _length * RATIO_SIDE*RATIO_SIDE)
-        b = project(end_point, start_point, 0, _length * (1.0-RATIO_SIDE*RATIO_SIDE))
+            _length = dist_23
+        a = project(end_point, start_point, 0, _length * TRIANGLE_RATIO_SIDE)
+        b = project(start_point, end_point, 0, _length * TRIANGLE_RATIO_SIDE)
+        square_midpoint = midpoint(a, b)
+        square_length = edist(a, b)
+        square_corner = project(square_midpoint, common_point, 0, square_length)
         return [
             MillarsTile(TRIANGLE_TILE, start_point, common_point, a),
-            MillarsTile(TRIANGLE_TILE, a, common_point, b),
+            MillarsTile(SQUARE_TILE, a, common_point, b, square_corner),
             MillarsTile(TRIANGLE_TILE, b, common_point, end_point),
         ]
 
@@ -362,6 +367,9 @@ def merge_triangles(triangles):
                     if y_cand[0] != entry[0] or y_cand[1] != entry[1]
                 ]
                 w_cand = only_unique[0]
+                # we may need to swap xz with yw 
+                if edist(x_cand, z_cand) < edist(y_cand, w_cand):
+                    x_cand, z_cand, y_cand, w_cand = y_cand, w_cand, x_cand, z_cand
                 rhomboid = MillarsTile(
                     RHOMB_TILE,
                     x_cand,
