@@ -20,11 +20,9 @@ import pytest
 
 sc = float(cos(pi / 4))
 sin_alpha = float(sin(pi / 4))
-RATIO_SIDE = sqrt(
-                (2.0 - sqrt(2.0)) / (2.0 + sqrt(2.0))
-            )
+RATIO_SIDE = sqrt((2.0 - sqrt(2.0)) / (2.0 + sqrt(2.0)))
 
-TRIANGLE_RATIO_SIDE = sqrt(2.0)*sqrt(2.0-sqrt(2.0))/2.0
+TRIANGLE_RATIO_SIDE = sqrt(2.0) * sqrt(2.0 - sqrt(2.0)) / 2.0
 
 
 class MillarsTile:
@@ -36,6 +34,23 @@ class MillarsTile:
         self.w = w
         self.id = ""
         self.other_triangle_id = None
+
+    def star_triangle_check(self):
+        angles = [0] * 3
+        angles[0] = abs(angle(self.x, self.z, self.y))
+        angles[1] = abs(angle(self.y, self.x, self.z))
+        angles[2] = abs(angle(self.z, self.y, self.x))
+        print(f"in star_triangle_check {angles=} {self.y=} {self.x=} {self.z=}")
+        angles.sort()
+        assert (
+            pytest.approx(angles[0]) == pi / 8.0
+        ), f"angles don't look right! {angles[0]}"
+        assert (
+            pytest.approx(angles[1]) == pi / 8.0
+        ), f"angles don't look right! {angles}"
+        assert (
+            pytest.approx(angles[2]) == 3 * pi / 4.0
+        ), f"angles don't look right! {angles[2]}"
 
     def square_check(self):
         center_point = midpoint(self.x, self.z)
@@ -167,9 +182,15 @@ class MillarsTile:
 
     def to_subtiles_rhomb(self):
         center_point = midpoint(self.y, self.w)
-        side = edist(self.y, center_point)
+        side = min(
+            edist(self.y, center_point), edist(self.x, center_point)
+        )  # take into account the possible orientations?
         midpoint1 = project(self.y, center_point, pi / 2, side)
         midpoint2 = project(self.w, center_point, pi / 2, side)
+        print(
+            f"rhombus calcs {midpoint1=} {midpoint2=} {center_point=} {self.to_points()} distance"
+        )
+        # assert pytest.approx(edist(self.x, midpoint2)) == pytest.approx(edist(self.y, midpoint2))
 
         return [
             MillarsTile(SQUARE_TILE, midpoint2, self.y, midpoint1, self.w),
@@ -367,7 +388,7 @@ def merge_triangles(triangles):
                     if y_cand[0] != entry[0] or y_cand[1] != entry[1]
                 ]
                 w_cand = only_unique[0]
-                # we may need to swap xz with yw 
+                # we may need to swap xz with yw
                 if edist(x_cand, z_cand) < edist(y_cand, w_cand):
                     x_cand, z_cand, y_cand, w_cand = y_cand, w_cand, x_cand, z_cand
                 rhomboid = MillarsTile(

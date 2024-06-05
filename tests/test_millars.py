@@ -101,14 +101,36 @@ def test_subtiles_triangle():
     assert pytest.approx(triangles[1].z[1]) == 0.975655
 
 
-def test_subtiles_rhombus():
-    w = vector([4142.135623730951, 10000.0])
-    rhombus = MillarsTile(RHOMB_TILE, x=vector([1715.7287525380993, 9999.999999999998]), 
-    y=vector([1715.7287525380998,7573.593128807149]), 
-    z=vector([4142.135623730949, 7573.593128807149]), 
-    w=w)
+@pytest.mark.parametrize(
+    "coords",
+    [
+        (
+            vector([7.173814858237198e-13, 11715.7287525381]),
+            vector([-1715.7287525380987, 15857.864376269048]),
+            vector([0, 20000]),
+            vector([1715.7287525380993, 15857.864376269048]),
+        ),
+    ],
+)
+def test_subtiles_rhombus(coords):
+    rhombus = MillarsTile(
+        RHOMB_TILE,
+        x=coords[0],
+        y=coords[1],
+        z=coords[2],
+        w=coords[3],
+    )
+    rhombus.rhombus_check()
     subtiles = rhombus.to_subtiles_rhomb()
     assert subtiles[0].square_check()
+
+    for i in range(1, len(subtiles)):
+        print(f"evaluating triangle {i}")
+        assert edist(subtiles[i].x, subtiles[i].y) == edist(
+            subtiles[i].y, subtiles[i].z
+        )
+        subtiles[i].star_triangle_check()
+
 
 @pytest.mark.parametrize(
     "triangle1, triangle2",
