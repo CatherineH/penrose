@@ -58,7 +58,12 @@ class MillarsTile:
         angle_between2 = angle(self.y, self.z, center_point) / 2.0
         angle_between3 = angle(self.z, self.w, center_point) / 2.0
         angle_between4 = angle(self.w, self.x, center_point) / 2.0
-
+        assert (
+            pytest.approx(edist(self.x, self.y))
+            == pytest.approx(edist(self.y, self.z))
+            == pytest.approx(edist(self.z, self.w))
+            == pytest.approx(edist(self.w, self.x))
+        )
         assert (
             pytest.approx(angle_between)
             == pytest.approx(angle_between2)
@@ -84,6 +89,15 @@ class MillarsTile:
         print(
             f"rhombus check 2: {angle(self.y, self.x, self.w)} == {angle(self.w, self.z, self.y)}, {angle(self.x, self.y, self.z)} == {angle(self.z, self.w, self.x)}"
         )
+        corner_angles = [
+            angle(self.y, self.x, self.w),
+            angle(self.w, self.z, self.y),
+            angle(self.x, self.y, self.z),
+            angle(self.z, self.w, self.x),
+        ]
+        corner_angles = sorted([corner_angle for corner_angle in corner_angles])
+        print(f"rhombus check {corner_angles=}")
+        # assert pytest.approx(corner_angles[0]) == pi/4.0
         rhombus_rules = True
         rhombus_rules = rhombus_rules and pytest.approx(
             angle(self.y, self.x, self.w)
@@ -91,6 +105,10 @@ class MillarsTile:
         rhombus_rules = rhombus_rules and pytest.approx(
             angle(self.x, self.y, self.z)
         ) == pytest.approx(angle(self.z, self.w, self.x))
+        rhombus_rules = rhombus_rules and pytest.approx(corner_angles[0]) == pi / 4.0
+        rhombus_rules = (
+            rhombus_rules and pytest.approx(corner_angles[-1]) == 3.0 * pi / 4.0
+        )
         return len(angle_signs) == 1 and rhombus_rules
 
     def to_points(self):
@@ -272,9 +290,17 @@ class MillarsTile:
         square_midpoint = midpoint(a, b)
         square_length = edist(a, b)
         square_corner = project(square_midpoint, common_point, 0, square_length)
+        _square_tile = MillarsTile(SQUARE_TILE, a, common_point, b, square_corner)
+        assert _square_tile.square_check()
+        _triangle_angle_1 = abs(angle(start_point, a, common_point))
+        _triangle_angle_2 = abs(angle(end_point, b, common_point))
+        print(f"inside to subtiles triangle {_triangle_angle_1/pi}")
+        assert pytest.approx(_triangle_angle_1) == pi / 8.0
+        assert pytest.approx(_triangle_angle_2) == pi / 8.0
+
         return [
             MillarsTile(TRIANGLE_TILE, start_point, common_point, a),
-            MillarsTile(SQUARE_TILE, a, common_point, b, square_corner),
+            _square_tile,
             MillarsTile(TRIANGLE_TILE, b, common_point, end_point),
         ]
 
