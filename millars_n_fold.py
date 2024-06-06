@@ -40,7 +40,6 @@ class MillarsTile:
         angles[0] = abs(angle(self.x, self.z, self.y))
         angles[1] = abs(angle(self.y, self.x, self.z))
         angles[2] = abs(angle(self.z, self.y, self.x))
-        print(f"in star_triangle_check {angles=} {self.y=} {self.x=} {self.z=}")
         angles.sort()
         assert (
             pytest.approx(angles[0]) == pi / 8.0
@@ -85,23 +84,17 @@ class MillarsTile:
         angles[1] = angle(self.y, self.z, center_point) / 2.0
         angles[2] = angle(self.z, self.w, center_point) / 2.0
         angles[3] = angle(self.w, self.x, center_point) / 2.0
-        print(f"rhombus check: {angles=}")
 
         def sign(x):
             return x > 0
 
         angle_signs = set(sign(_angle) for _angle in angles)
-        print(f"rhombus check: {angles=} {angle_signs=}")
-        print(
-            f"rhombus check 2: {angle(self.y, self.x, self.w)} == {angle(self.w, self.z, self.y)}, {angle(self.x, self.y, self.z)} == {angle(self.z, self.w, self.x)}"
-        )
         corner_angles = [
             angle(self.w, self.y, self.x),
             angle(self.w, self.z, self.y),
             angle(self.y, self.w, self.z),
             angle(self.z, self.y, self.w),
         ]
-        print(corner_angles)
         corner_angles = sorted([abs(corner_angle) for corner_angle in corner_angles])
         rhombus_rules = True
         rhombus_rules = rhombus_rules and pytest.approx(
@@ -130,11 +123,9 @@ class MillarsTile:
             angle_between = self.square_check()
             midpoint1 = project(self.x, center_point, angle_between, side)
 
-            # print("angle between:", angle_between, self.x, side, center_point)
             midpoint2 = project(self.y, center_point, angle_between, side)
             midpoint3 = project(self.z, center_point, angle_between, side)
             midpoint4 = project(self.w, center_point, angle_between, side)
-            # print(f"midpoints: {midpoint1} {midpoint2} {midpoint3} {midpoint4}")
 
             return [
                 self.x,
@@ -205,29 +196,29 @@ class MillarsTile:
         ]
 
     def to_subtiles_rhomb(self):
+        # we will be guaranteed from the triangle merge that x and z are the wide sides of the rhombus, but nothing else
+        # about the orientation
         center_point = midpoint(self.y, self.w)
         side = min(
             edist(self.y, center_point), edist(self.x, center_point)
         )  # take into account the possible orientations?
         midpoint1 = project(self.y, center_point, pi / 2, side)
         midpoint2 = project(self.w, center_point, pi / 2, side)
-        print(
-            f"rhombus calcs {midpoint1=} {midpoint2=} {center_point=} {self.to_points()} distance"
-        )
-        # assert pytest.approx(edist(self.x, midpoint2)) == pytest.approx(edist(self.y, midpoint2))
+        # we want midpoint2 to be closer to self.x than midpoint1
+        if edist(self.x, midpoint1) < edist(self.x, midpoint2):
+            midpoint1, midpoint2 = midpoint2, midpoint1
 
         return [
             MillarsTile(SQUARE_TILE, midpoint2, self.y, midpoint1, self.w),
             MillarsTile(TRIANGLE_TILE, self.x, midpoint2, self.y),
-            MillarsTile(TRIANGLE_TILE, self.x, midpoint2, self.z),
-            MillarsTile(TRIANGLE_TILE, self.w, midpoint1, self.y),
-            MillarsTile(TRIANGLE_TILE, self.w, midpoint1, self.z),
+            MillarsTile(TRIANGLE_TILE, self.x, midpoint2, self.w),
+            MillarsTile(TRIANGLE_TILE, self.z, midpoint1, self.y),
+            MillarsTile(TRIANGLE_TILE, self.z, midpoint1, self.w),
         ]
 
     def to_subtiles_star(self):
         center_point = midpoint(self.x, self.z)
         points = self.to_points()
-        print(f"subtiles star {self.x} {self.y} {self.z} {self.w} {center_point}")
         side_length = edist(center_point, points[1]) * sqrt(2)
         angle_between = angle(self.x, self.y, center_point) / 2
 
@@ -300,10 +291,6 @@ class MillarsTile:
         _triangle_angle_1 = abs(angle(start_point, a, common_point))
         _triangle_angle_2 = abs(angle(end_point, b, common_point))
 
-        print(
-            f"inside to subtiles triangle {_triangle_angle_1 / pi} {_triangle_angle_2 / pi}"
-        )
-
         if not _square_tile.square_check():
             return []
         assert pytest.approx(_triangle_angle_1) == pi / 8.0
@@ -361,7 +348,6 @@ class MillarsNFoldTiling(Tiling):
 def merge_triangles(triangles):
     rhomboids = []
     # merge the triangles
-    print(f"start {triangles=}")
     auto_increment = 0
     for triangle in triangles:
         if not triangle.id:
@@ -369,7 +355,6 @@ def merge_triangles(triangles):
             auto_increment += 1
 
         if triangle.other_triangle_id:
-            print(f"we already know {triangle.other_triangle_id=}")
             continue  # we already know this one
         for other_triangle in triangles:
             if not other_triangle.id:
@@ -387,47 +372,19 @@ def merge_triangles(triangles):
             only_unique = triangles_to_square(
                 comparison_points, expected_size=average_size_length, debug=debug
             )
-            # TODO: we need to determine whether the values are concave, that means they should all be going in the same direction?
-            # print(f"only_unique {only_unique}")
             if only_unique:
-                x_cand = None
-                for only_u in only_unique:
-                    if x_cand is None:
-                        x_cand = only_u
-                    if x_cand[0] > only_u[0]:
-                        x_cand = only_u
-                only_unique = [
-                    entry
-                    for entry in only_unique
-                    if x_cand[0] != entry[0] or x_cand[1] != entry[1]
-                ]
-                assert len(only_unique) == 3, f"{only_unique} {x_cand}"
-                z_cand = None
-                for only_u in only_unique:
-                    if z_cand is None:
-                        z_cand = only_u
-                    if z_cand[0] < only_u[0]:
-                        z_cand = only_u
-                only_unique = [
-                    entry
-                    for entry in only_unique
-                    if z_cand[0] != entry[0] or z_cand[1] != entry[1]
-                ]
-                y_cand = None
-                for only_u in only_unique:
-                    if y_cand is None:
-                        y_cand = only_u
-                    if y_cand[1] > only_u[1]:
-                        y_cand = only_u
-                only_unique = [
-                    entry
-                    for entry in only_unique
-                    if y_cand[0] != entry[0] or y_cand[1] != entry[1]
-                ]
-                w_cand = only_unique[0]
-                # we may need to swap xz with yw
-                if edist(x_cand, z_cand) < edist(y_cand, w_cand):
-                    x_cand, z_cand, y_cand, w_cand = y_cand, w_cand, x_cand, z_cand
+                center_point = sum(only_unique) / 4.0
+                dists_to_center = []
+                for point in only_unique:
+                    dists_to_center.append((point, edist(point, center_point)))
+                dists_to_center.sort(key=lambda x: x[1])
+
+                x_cand = dists_to_center[2][0]
+                z_cand = dists_to_center[3][0]
+                y_cand = dists_to_center[0][0]
+                w_cand = dists_to_center[1][0]
+                # we may need to swap x/z and y/w for orientation ?
+
                 rhomboid = MillarsTile(
                     RHOMB_TILE,
                     x_cand,
@@ -458,6 +415,7 @@ def triangles_to_square(comparison_points, expected_size=1.0, debug=False):
     )
     # reduce the points that over top of each other
     only_unique = [comparison_points[0]]
+
     if debug:
         print(f"expected_size {expected_size}")
         print(f"after sorting: {comparison_points}")
@@ -483,8 +441,7 @@ def triangles_to_square(comparison_points, expected_size=1.0, debug=False):
 
 
 if __name__ == "__main__":
-    for generations in range(1, 6):
+    for generations in range(1, 8):
         _tiling = MillarsNFoldTiling(generations)
         _tiling.tiles = _tiling.get_tiles()
-        print("tiles", _tiling.tiles)
         _tiling.gen_svg()

@@ -314,7 +314,6 @@ class Tiling(object):
             return
         size = 200
         [x_min, x_max, y_min, y_max] = get_bounding_box(self.tiles, size)
-        print([tile.tile_type for tile in self.tiles])
         view_box = [-x_min, y_min, x_min * 2, y_max - y_min]
         squares = [tile for tile in self.tiles if tile.tile_type == SQUARE_TILE]
         rhomboids = [tile for tile in self.tiles if tile.tile_type == RHOMB_TILE]
@@ -350,7 +349,6 @@ class Tiling(object):
                         adjacency_matrix[j].append(i)
             num_colors = 4
             colors = [i for i in range(num_colors)]
-            print(adjacency_matrix)
 
             problem = Problem()
             for i in range(len(final_shapes)):

@@ -126,7 +126,7 @@ def test_subtiles_rhombus(coords):
 
     for i in range(1, len(subtiles)):
         print(f"evaluating triangle {i}")
-        assert edist(subtiles[i].x, subtiles[i].y) == edist(
+        assert pytest.approx(edist(subtiles[i].x, subtiles[i].y)) == edist(
             subtiles[i].y, subtiles[i].z
         )
         subtiles[i].star_triangle_check()
