@@ -137,10 +137,44 @@ def test_subtiles_rhombus(coords):
     [
         (
             MillarsTile(
-                TRIANGLE_TILE, vector([-2, 1]), vector([0, 1]), vector([2, -1])
+                TRIANGLE_TILE,
+                vector([0, 20000]),
+                vector([7.173814858237198e-13, 11715.7287525381]),
+                vector([1715.7287525380993, 15857.864376269048]),
             ),
             MillarsTile(
-                TRIANGLE_TILE, vector([-2, 1]), vector([0, -1]), vector([2, -1])
+                TRIANGLE_TILE,
+                vector([0, 20000]),
+                vector([7.173814858237198e-13, 11715.7287525381]),
+                vector([-1715.7287525380987, 15857.864376269048]),
+            ),
+        ),
+        (
+            MillarsTile(
+                TRIANGLE_TILE,
+                vector([4142.135623730951, 10000.0]),
+                vector([7.173814858237198e-13, 11715.7287525381]),
+                vector([5857.86437626905, 5857.86437626905]),
+            ),
+            MillarsTile(
+                TRIANGLE_TILE,
+                vector([5857.86437626905, 5857.86437626905]),
+                vector([1715.7287525380993, 7573.59312880715]),
+                vector([7.173814858237198e-13, 11715.7287525381]),
+            ),
+        ),
+        (
+            MillarsTile(
+                TRIANGLE_TILE,
+                vector([10000.0, 4142.135623730951]),
+                vector([10000.0, 1715.7287525380993]),
+                vector([11715.7287525381, 0.0]),
+            ),
+            MillarsTile(
+                TRIANGLE_TILE,
+                vector([11715.7287525381, 0.0]),
+                vector([11715.7287525381, 2426.406871192851]),
+                vector([10000.0, 4142.135623730951]),
             ),
         ),
     ],
